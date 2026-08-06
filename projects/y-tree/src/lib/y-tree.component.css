@@ -115,3 +115,13 @@
   left: 0;
   right: 0;
 }
+.y-tree-indent {
+  display: inline-block;
+  flex: none;
+  height: 28px;
+  vertical-align: top;
+}
+
+.y-tree-indent-leaf {
+  margin-right: 6px;
+}

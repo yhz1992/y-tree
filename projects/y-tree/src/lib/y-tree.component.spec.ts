@@ -47,8 +47,11 @@ describe('YTreeComponent', () => {
     expect(nodes[0].querySelector('.y-tree-title').textContent.trim()).toBe(
       '节点1'
     );
-    expect(nodes[1].style.paddingLeft).toBe('20px');
-    expect(nodes[2].style.paddingLeft).toBe('20px');
+    // 缩进由 indent 元素实现（level * 20px）
+    const indent1 = nodes[1].querySelector('.y-tree-indent') as HTMLElement;
+    const indent2 = nodes[2].querySelector('.y-tree-indent') as HTMLElement;
+    expect(indent1.style.width).toBe('20px');
+    expect(indent2.style.width).toBe('20px');
   });
 
   it('getNodeById 应返回节点信息', () => {

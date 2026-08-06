@@ -22,21 +22,25 @@
         'is-selected': item.node.selected,
         'is-disabled': item.node.disabled
       }"
-      [style.padding-left.px]="item.node.level * 20"
       (click)="onClick($event, item.id)"
       (dblclick)="onDbClick($event, item.id)"
       (contextmenu)="onContextMenu($event, item.id)"
     >
       <span
+        class="y-tree-indent"
+        [class.y-tree-indent-leaf]="item.node.childIds.length === 0"
+        [style.width.px]="
+          item.node.level * 24 + (item.node.childIds.length === 0 ? 16 : 0)
+        "
+        [style.background]="indentBg(item.node)"
+      ></span>
+      <span
         class="y-tree-switcher"
-        [ngClass]="{
-          'has-children': item.node.childIds.length > 0,
-          'is-expanded': isExpanded(item.id)
-        }"
+        *ngIf="item.node.childIds.length > 0"
+        [ngClass]="{ 'has-children': true, 'is-expanded': isExpanded(item.id) }"
         (click)="onExpandChange($event, item.id)"
       >
         <i
-          *ngIf="item.node.childIds.length > 0"
           class="fa-solid y-tree-switcher-icon"
           [ngClass]="
             isExpanded(item.id) ? 'fa-chevron-down' : 'fa-chevron-right'
