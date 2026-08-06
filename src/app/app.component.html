@@ -1,0 +1,20 @@
+<div class="app">
+  <h1>y-tree · Angular</h1>
+  <div class="app-card">
+    <y-tree
+      [datasource]="datasource"
+      [checkable]="true"
+      [showLine]="true"
+      [expandAll]="true"
+      (click)="onClick($event)"
+      (dbClick)="onDbClick($event)"
+      (contextMenu)="onContextMenu($event)"
+      (expandChange)="onExpandChange($event)"
+      (checkedChange)="onCheckedChange($event)"
+    ></y-tree>
+  </div>
+  <p>
+    <button (click)="generateLargeData()">生成 10 万节点（6 层）</button>
+    <button (click)="printChecked()">打印已勾选节点</button>
+  </p>
+</div>

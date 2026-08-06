@@ -1,3 +1,75 @@
-<div class="y-tree">
-	<ng-content *ngFor="let node of nodeIds" [node]="node"></ng-content>
+<div
+  class="y-tree"
+  [ngClass]="['y-tree-' + size, className]"
+  [style.height.px]="height"
+  (scroll)="onVirtualScroll($event)"
+>
+  <div
+    class="y-tree-virtual-spacer"
+    [style.height.px]="total * ROW_HEIGHT"
+  ></div>
+  <div
+    class="y-tree-virtual-content"
+    [style.transform]="'translateY(' + start * ROW_HEIGHT + 'px)'"
+  >
+    <div
+      *ngFor="let item of visibleSlice"
+      class="y-tree-node"
+      [ngClass]="{
+        'is-root': item.node.isRoot,
+        'is-first': item.node.isFirst,
+        'is-last': item.node.isLast,
+        'is-selected': item.node.selected,
+        'is-disabled': item.node.disabled
+      }"
+      [style.padding-left.px]="item.node.level * 20"
+      (click)="onClick($event, item.id)"
+      (dblclick)="onDbClick($event, item.id)"
+      (contextmenu)="onContextMenu($event, item.id)"
+    >
+      <span
+        class="y-tree-switcher"
+        [ngClass]="{
+          'has-children': item.node.childIds.length > 0,
+          'is-expanded': isExpanded(item.id)
+        }"
+        (click)="onExpandChange($event, item.id)"
+      >
+        <i
+          *ngIf="item.node.childIds.length > 0"
+          class="fa-solid y-tree-switcher-icon"
+          [ngClass]="
+            isExpanded(item.id) ? 'fa-chevron-down' : 'fa-chevron-right'
+          "
+        ></i>
+      </span>
+
+      <label
+        *ngIf="checkable && !item.node.nocheck"
+        class="y-tree-checkbox"
+        (click)="$event.stopPropagation()"
+      >
+        <input
+          type="checkbox"
+          class="y-tree-checkbox-input"
+          [checked]="!!item.node.checked"
+          [indeterminate]="!!item.node.halfChecked"
+          [disabled]="!!item.node.disabled || !!item.node.checkboxDisabled"
+          (change)="onCheckedChange($event, item.id)"
+        />
+        <i
+          class="fa-regular y-tree-checkbox-icon"
+          [ngClass]="{
+            'fa-square': !item.node.checked && !item.node.halfChecked,
+            'fa-square-minus': !!item.node.halfChecked,
+            'fa-square-check': !!item.node.checked
+          }"
+        ></i>
+      </label>
+
+      <span class="y-tree-title" [ngClass]="{ 'is-link': showLine }">
+        {{ item.node.name }}
+      </span>
+    </div>
+  </div>
 </div>
