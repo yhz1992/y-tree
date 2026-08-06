@@ -1,6 +1,6 @@
-/* y-tree 组件共享基础样式（Angular 库内副本）
- * 唯一权威来源：/common/style/base.css（项目根）
- * 注意：ng-packagr 限制库不能引用库外文件，故此处需与根目录 base.css 保持一致
+/* y-tree 组件共享基础样式（三个框架共用：Angular / React / Vue）
+ * 唯一权威来源：common/style/base.css
+ * 修改此处后需同步：angular/projects/y-tree/src/common/style/base.css（ng-packagr 限制库内引用）
  */
 .y-tree {
   position: relative;
@@ -26,10 +26,6 @@
   padding-right: 8px;
   cursor: default;
   white-space: nowrap;
-}
-
-.y-tree-node:hover {
-  background-color: rgba(0, 0, 0, 0.04);
 }
 
 .y-tree-node.is-selected > .y-tree-title {
@@ -103,6 +99,11 @@
 .y-tree-title {
   padding: 2px 4px;
   border-radius: 3px;
+}
+
+.y-tree-title:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  cursor: pointer;
 }
 
 .y-tree-virtual-spacer {

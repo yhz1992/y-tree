@@ -1,12 +1,13 @@
 {
-	"name": "y-tree",
-	"version": "0.0.1",
-	"peerDependencies": {
-		"@angular/common": "^15.2.0",
-		"@angular/core": "^15.2.0"
-	},
-	"dependencies": {
-		"tslib": "^2.3.0"
-	},
-	"sideEffects": false
+  "name": "y-tree",
+  "version": "0.1.0",
+  "description": "y-tree 树组件（Angular 版）",
+  "sideEffects": false,
+  "peerDependencies": {
+    "@angular/common": "^15.2.0",
+    "@angular/core": "^15.2.0"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  }
 }
