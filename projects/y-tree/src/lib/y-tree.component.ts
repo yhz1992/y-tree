@@ -18,7 +18,7 @@ import type { NodeId, YTreeModel } from '../common/model';
 @Component({
   selector: 'y-tree',
   templateUrl: './y-tree.component.html',
-  styleUrls: ['./y-tree.component.css'],
+  styleUrls: ['./y-tree.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class YTreeComponent implements OnChanges, OnDestroy {
@@ -155,7 +155,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * @param list 节点id集合
    */
   private toSetOrNull(
-    list: Array<string | number> | null
+    list: Array<string | number> | null,
   ): Set<string | number> | null {
     return list && list.length > 0 ? new Set(list) : null;
   }
@@ -172,7 +172,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
       this.toSetOrNull(this.nocheckIds),
       undefined,
       this.toSetOrNull(this.expandIds),
-      undefined
+      undefined,
     );
 
     // 初始化展开集合
@@ -238,7 +238,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const viewportRows = Math.ceil(this.height / this.ROW_HEIGHT);
     this.end = Math.min(
       this.total,
-      this.start + viewportRows + YTreeComponent.OVERSCAN * 2
+      this.start + viewportRows + YTreeComponent.OVERSCAN * 2,
     );
     this.visibleSlice = this.visibleNodes.slice(this.start, this.end);
   }
@@ -251,7 +251,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const top = (event.target as HTMLElement).scrollTop;
     this.start = Math.max(
       0,
-      Math.floor(top / this.ROW_HEIGHT) - YTreeComponent.OVERSCAN
+      Math.floor(top / this.ROW_HEIGHT) - YTreeComponent.OVERSCAN,
     );
     this.updateVisibleSlice();
     this.ref.markForCheck();
@@ -298,11 +298,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
         // 本节点自己的列：最后子 → 半截（到横线）；否则贯穿
         const height = ancestor.isLast ? '14px' : '100%';
         layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px ${height} no-repeat`
+          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px ${height} no-repeat`,
         );
       } else if (!ancestor.isLast) {
         layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`
+          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`,
         );
       }
     }
@@ -310,7 +310,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const startX = (L - 1) * 24 + 8;
     const lineLen = node.childIds.length === 0 ? L * 24 + 16 - startX : 12;
     layers.push(
-      `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) ${startX}px 14px / ${lineLen}px 1px no-repeat`
+      `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) ${startX}px 14px / ${lineLen}px 1px no-repeat`,
     );
     return layers.join(', ');
   }
