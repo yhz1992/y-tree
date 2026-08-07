@@ -8,9 +8,18 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   OnDestroy,
+  ContentChild,
+  TemplateRef,
 } from '@angular/core';
 import { YTreeService } from '../common/service';
-import type { NodeId, YTreeModel } from '../common/model';
+import type {
+  NodeId,
+  YTreeModel,
+  YTreeAddEvent,
+  YTreeNodeEvent,
+  YTreeRemoveEvent,
+  YTreeRenameEvent,
+} from '../common/model';
 
 /**
  * y-tree 多功能树组件
@@ -46,6 +55,42 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * 节点是否可拖拽
    */
   @Input() draggable: boolean = false;
+  /**
+   * 是否启用编辑能力（重命名/删除/新增按钮）
+   */
+  @Input() editable: boolean = false;
+  /**
+   * 是否显示重命名按钮
+   */
+  @Input() showRenameBtn: boolean = true;
+  /**
+   * 是否显示删除按钮
+   */
+  @Input() showRemoveBtn: boolean = true;
+  /**
+   * 是否显示新增按钮
+   */
+  @Input() showAddBtn: boolean = true;
+  /**
+   * 删除前是否弹气泡确认
+   */
+  @Input() removeConfirm: boolean = true;
+  /**
+   * 进入编辑态前置拦截，返回 false 取消
+   */
+  @Input() beforeEditName?: (payload: YTreeNodeEvent) => boolean;
+  /**
+   * 重命名提交前置拦截，返回 false 取消
+   */
+  @Input() beforeRename?: (payload: YTreeRenameEvent) => boolean;
+  /**
+   * 删除前置拦截，返回 false 取消
+   */
+  @Input() beforeRemove?: (payload: YTreeRemoveEvent) => boolean;
+  /**
+   * 新增前置拦截，返回 false 取消
+   */
+  @Input() beforeAdd?: (payload: YTreeAddEvent) => boolean;
   /**
    * 展开的节点id集合
    */
@@ -98,11 +143,60 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * 节点勾选框点击事件
    */
   @Output() checkedChange = new EventEmitter<any>();
+  /**
+   * 节点拖拽移动事件（draggable 开启时触发）
+   */
+  @Output() nodeChange = new EventEmitter<any>();
+  /**
+   * 节点重命名事件
+   */
+  @Output() rename = new EventEmitter<any>();
+  /**
+   * 节点删除事件
+   */
+  @Output() remove = new EventEmitter<any>();
+  /**
+   * 节点新增事件
+   */
+  @Output() add = new EventEmitter<any>();
+  /**
+   * 自定义节点 DOM 模板（对标 zTree addDiyDom）
+   */
+  @ContentChild('nodeExtra', { static: false })
+  nodeExtraTemplate: TemplateRef<any> | null = null;
 
   /**
    * 可见节点列表（扁平化渲染）
    */
   protected visibleNodes: Array<{ id: NodeId; node: YTreeModel }> = [];
+
+  /**
+   * 拖拽状态：正在拖拽的节点id
+   */
+  protected draggingId: NodeId | null = null;
+
+  /**
+   * 拖拽状态：当前落点（用于高亮指示）
+   */
+  protected dropTarget: {
+    id: NodeId;
+    position: 'inner' | 'prev' | 'next';
+  } | null = null;
+
+  /**
+   * 编辑状态：正在重命名的节点id
+   */
+  protected editingId: NodeId | null = null;
+
+  /**
+   * 编辑状态：重命名输入框内容
+   */
+  protected editValue: string = '';
+
+  /**
+   * 编辑状态：待确认删除的节点id
+   */
+  protected confirmRemoveId: NodeId | null = null;
 
   /**
    * 虚拟滚动行高（px），固定行高是虚拟滚动的前提
@@ -155,7 +249,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * @param list 节点id集合
    */
   private toSetOrNull(
-    list: Array<string | number> | null,
+    list: Array<string | number> | null
   ): Set<string | number> | null {
     return list && list.length > 0 ? new Set(list) : null;
   }
@@ -172,7 +266,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
       this.toSetOrNull(this.nocheckIds),
       undefined,
       this.toSetOrNull(this.expandIds),
-      undefined,
+      undefined
     );
 
     // 初始化展开集合
@@ -202,12 +296,8 @@ export class YTreeComponent implements OnChanges, OnDestroy {
       return;
     }
 
-    const rootIds: Array<NodeId> = [];
-    flatMap.forEach((node) => {
-      if (node.isRoot) {
-        rootIds.push(node.id);
-      }
-    });
+    // 根顺序以 service.getRootIds() 为准（moveNode 会更新此顺序）
+    const rootIds: Array<NodeId> = this.service?.getRootIds() ?? [];
 
     const stack: Array<NodeId> = [...rootIds].reverse();
     while (stack.length) {
@@ -238,7 +328,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const viewportRows = Math.ceil(this.height / this.ROW_HEIGHT);
     this.end = Math.min(
       this.total,
-      this.start + viewportRows + YTreeComponent.OVERSCAN * 2,
+      this.start + viewportRows + YTreeComponent.OVERSCAN * 2
     );
     this.visibleSlice = this.visibleNodes.slice(this.start, this.end);
   }
@@ -251,7 +341,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const top = (event.target as HTMLElement).scrollTop;
     this.start = Math.max(
       0,
-      Math.floor(top / this.ROW_HEIGHT) - YTreeComponent.OVERSCAN,
+      Math.floor(top / this.ROW_HEIGHT) - YTreeComponent.OVERSCAN
     );
     this.updateVisibleSlice();
     this.ref.markForCheck();
@@ -298,11 +388,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
         // 本节点自己的列：最后子 → 半截（到横线）；否则贯穿
         const height = ancestor.isLast ? '14px' : '100%';
         layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px ${height} no-repeat`,
+          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px ${height} no-repeat`
         );
       } else if (!ancestor.isLast) {
         layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`,
+          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`
         );
       }
     }
@@ -310,7 +400,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const startX = (L - 1) * 24 + 8;
     const lineLen = node.childIds.length === 0 ? L * 24 + 16 - startX : 12;
     layers.push(
-      `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) ${startX}px 14px / ${lineLen}px 1px no-repeat`,
+      `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) ${startX}px 14px / ${lineLen}px 1px no-repeat`
     );
     return layers.join(', ');
   }
@@ -378,6 +468,267 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const ok = this.service?.setCheckedByUser(id, checked, !this.checkStrictly);
     if (ok) {
       this.checkedChange.emit({ event: event as MouseEvent, id, checked });
+      this.updateView();
+    }
+  }
+
+  /**
+   * 计算拖拽落点：行高固定 28px，按相对行的纵向位置三分
+   * @param event
+   * @param hasChildren
+   */
+  private calcDropPosition(
+    event: DragEvent,
+    hasChildren: boolean
+  ): 'inner' | 'prev' | 'next' {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const offset = event.clientY - rect.top;
+    const ratio = offset / rect.height;
+    if (ratio < 0.25) {
+      return 'prev';
+    }
+    if (ratio > 0.75) {
+      return 'next';
+    }
+    return hasChildren ? 'inner' : 'prev';
+  }
+
+  /**
+   * 清理拖拽状态
+   */
+  private cleanupDrag(): void {
+    this.draggingId = null;
+    this.dropTarget = null;
+    this.ref.markForCheck();
+  }
+
+  /**
+   * 节点拖拽开始
+   * @param event
+   * @param id
+   */
+  protected onDragStart(event: DragEvent, id: NodeId) {
+    if (!this.draggable) {
+      return;
+    }
+    const node = this.service?.getNodeById(id);
+    if (!node || node.disabled) {
+      return;
+    }
+    this.draggingId = id;
+    this.ref.markForCheck();
+    // 拖拽时收起非叶子节点（延迟到拖拽会话建立后执行，避免 dragstart 期间同步 DOM 变化中断拖拽）
+    if (node.childIds.length > 0 && this.expandedIds.has(id)) {
+      const collapseId = id;
+      window.setTimeout(() => {
+        if (this.expandedIds.has(collapseId)) {
+          this.expandedIds.delete(collapseId);
+          this.updateView();
+        }
+      }, 0);
+    }
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(id));
+      // 拖拽预览：避免虚拟滚动卸载源节点导致拖拽中断
+      try {
+        event.dataTransfer.setDragImage(
+          event.currentTarget as HTMLElement,
+          20,
+          14
+        );
+      } catch {
+        /* 部分浏览器不支持 setDragImage */
+      }
+    }
+  }
+
+  /**
+   * 节点拖拽经过（计算落点并高亮）
+   * @param event
+   * @param id
+   */
+  protected onDragOver(event: DragEvent, id: NodeId) {
+    if (!this.draggable || this.draggingId === null) {
+      return;
+    }
+    const node = this.service?.getNodeById(id);
+    if (!node || node.disabled) {
+      return;
+    }
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+    this.dropTarget = {
+      id,
+      position: this.calcDropPosition(event, node.childIds.length > 0),
+    };
+    this.ref.markForCheck();
+  }
+
+  /**
+   * 节点拖拽放下（执行移动并通知外部）
+   * @param event
+   * @param id
+   */
+  protected onDrop(event: DragEvent, id: NodeId) {
+    if (!this.draggable || this.draggingId === null) {
+      return;
+    }
+    event.preventDefault();
+    const target = this.dropTarget;
+    const sourceId = this.draggingId;
+    this.cleanupDrag();
+    if (!target || target.id !== id) {
+      return;
+    }
+    const moved = this.service?.moveNode(sourceId, id, target.position);
+    if (moved) {
+      this.nodeChange.emit({
+        event,
+        id: sourceId,
+        sourceId,
+        targetId: id,
+        position: target.position,
+      });
+      this.updateView();
+    }
+  }
+
+  /**
+   * 节点拖拽结束
+   */
+  protected onDragEnd() {
+    this.cleanupDrag();
+  }
+
+  // ---------- 编辑能力（P1） ----------
+
+  /**
+   * 进入编辑态（双击标题 / 点击笔按钮），beforeEditName 返回 false 取消
+   * @param event
+   * @param id
+   */
+  protected startEdit(event: MouseEvent, id: NodeId) {
+    if (!this.editable) {
+      return;
+    }
+    const node = this.service?.getNodeById(id);
+    if (!node) {
+      return;
+    }
+    if (this.beforeEditName?.({ event, id }) === false) {
+      return;
+    }
+    this.confirmRemoveId = null;
+    this.editingId = id;
+    this.editValue = node.name;
+    this.ref.markForCheck();
+  }
+
+  /**
+   * 重命名输入事件
+   * @param event
+   */
+  protected onEditInput(event: Event) {
+    this.editValue = (event.target as HTMLInputElement).value;
+  }
+
+  /**
+   * 提交重命名（Enter / blur），beforeRename 返回 false 仅退出不保存
+   * @param event
+   */
+  protected commitRename(event?: Event) {
+    if (this.editingId === null) {
+      return;
+    }
+    const id = this.editingId;
+    const node = this.service?.getNodeById(id);
+    const newName = this.editValue.trim();
+    this.editingId = null;
+    this.ref.markForCheck();
+    if (!node || !newName || newName === node.name) {
+      return;
+    }
+    const oldName = node.name;
+    const payload: YTreeRenameEvent = {
+      event: (event ?? undefined) as MouseEvent,
+      id,
+      oldName,
+      newName,
+    };
+    if (this.beforeRename?.(payload) === false) {
+      return;
+    }
+    const ok = this.service?.renameNode(id, newName);
+    if (ok) {
+      this.rename.emit(payload);
+      this.updateView();
+    }
+  }
+
+  /**
+   * 取消编辑（Esc）
+   */
+  protected cancelEdit() {
+    this.editingId = null;
+    this.ref.markForCheck();
+  }
+
+  /**
+   * 关闭删除确认气泡
+   */
+  protected closeConfirm() {
+    this.confirmRemoveId = null;
+    this.ref.markForCheck();
+  }
+
+  /**
+   * 点击垃圾桶：切换确认气泡显隐
+   * @param event
+   * @param id
+   */
+  protected handleRemoveClick(event: MouseEvent, id: NodeId) {
+    this.editingId = null;
+    this.confirmRemoveId = this.confirmRemoveId === id ? null : id;
+    this.ref.markForCheck();
+  }
+
+  /**
+   * 确认删除：beforeRemove 返回 false 取消
+   * @param event
+   * @param id
+   */
+  protected doRemove(event: MouseEvent, id: NodeId) {
+    this.closeConfirm();
+    if (this.beforeRemove?.({ event, id }) === false) {
+      return;
+    }
+    const removed = this.service?.removeNode(id) ?? [];
+    if (removed.length > 0) {
+      removed.forEach((rid) => this.expandedIds.delete(rid));
+      this.remove.emit({ event, id });
+      this.updateView();
+    }
+  }
+
+  /**
+   * 点击加号：给当前节点追加一个子节点，beforeAdd 返回 false 取消
+   * @param event
+   * @param id
+   */
+  protected handleAddClick(event: MouseEvent, id: NodeId) {
+    if (!this.editable) {
+      return;
+    }
+    if (this.beforeAdd?.({ event, id, parentId: id }) === false) {
+      return;
+    }
+    const newId = this.service?.addNode(id, { name: '新建节点' });
+    if (newId != null) {
+      this.expandedIds.add(id);
+      this.add.emit({ event, id: newId, parentId: id });
       this.updateView();
     }
   }

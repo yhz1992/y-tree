@@ -161,6 +161,59 @@ export interface YTreeNodeEvent {
   [key: string]: any;
 }
 
+/**
+ * 节点重命名事件
+ * @extends {YTreeNodeEvent}
+ */
+export interface YTreeRenameEvent extends YTreeNodeEvent {
+  /**
+   * 原名称
+   */
+  oldName: string;
+  /**
+   * 新名称
+   */
+  newName: string;
+}
+
+/**
+ * 节点删除事件
+ * @extends {YTreeNodeEvent}
+ */
+export interface YTreeRemoveEvent extends YTreeNodeEvent {}
+
+/**
+ * 节点新增事件
+ * @extends {YTreeNodeEvent}
+ */
+export interface YTreeAddEvent extends YTreeNodeEvent {
+  /**
+   * 父节点id
+   */
+  parentId: string | number;
+}
+
+/**
+ * 节点移动（拖拽）事件
+ * @extends {YTreeNodeEvent}
+ */
+export interface YTreeNodeChangeEvent extends YTreeNodeEvent {
+  /**
+   * 被移动节点id
+   * @type {string | number}
+   */
+  sourceId: string | number;
+  /**
+   * 目标节点id
+   * @type {string | number}
+   */
+  targetId: string | number;
+  /**
+   * 落点：inner=成为目标子节点，prev=插入目标之前，next=插入目标之后
+   */
+  position: "inner" | "prev" | "next";
+}
+
 export interface DataSource<M extends Array<YTreeNode | YTreeFlatNode>> {
   /**
    * 数据源建立连接

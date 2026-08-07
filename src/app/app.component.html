@@ -6,11 +6,17 @@
       [checkable]="true"
       [showLine]="true"
       [expandAll]="true"
+      [draggable]="true"
+      [editable]="true"
       (click)="onClick($event)"
       (dbClick)="onDbClick($event)"
       (contextMenu)="onContextMenu($event)"
       (expandChange)="onExpandChange($event)"
       (checkedChange)="onCheckedChange($event)"
+      (nodeChange)="onNodeChange($event)"
+      (rename)="onRename($event)"
+      (remove)="onRemove($event)"
+      (add)="onAdd($event)"
     ></y-tree>
   </div>
   <p>

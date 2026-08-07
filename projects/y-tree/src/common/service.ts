@@ -18,6 +18,7 @@ export class YTreeService {
     hideIds: Set<string | number> | null = null,
   ) {
     this.checkIds = checkIds;
+    this.checkIdsControlled = checkIds !== null;
     this.selectedIds = selectedIds;
     this.nocheckIds = nocheckIds;
     this.disabledIds = disabledIds;
@@ -65,6 +66,12 @@ export class YTreeService {
 
   /**
    * @type {number}
+   * 自动生成节点id的自增计数（配合时间戳，避免同毫秒冲突）
+   */
+  private nodeIdCounter: number = 0;
+
+  /**
+   * @type {number}
    * 整树可参与勾选计算的叶子节点总量
    */
   private treeLeafTotal: number = 0;
@@ -80,6 +87,12 @@ export class YTreeService {
    * 勾选节点的id集合
    */
   private checkIds: Set<NodeId> | null;
+
+  /**
+   * @type {boolean}
+   * 勾选集合是否由外部受控传入（rebuildCheckedStatus 会覆盖 checkIds，需用此标志区分受控语义）
+   */
+  private checkIdsControlled: boolean = false;
 
   /**
    * @type { Set<NodeId> | null }
@@ -272,6 +285,13 @@ export class YTreeService {
   }
 
   /**
+   * 获取根节点id集合（顺序即树根渲染顺序，moveNode 会更新此顺序）
+   */
+  public getRootIds(): Array<NodeId> {
+    return [...this.rootIds];
+  }
+
+  /**
    * 获取level维度节点map
    */
   public getLevelMap() {
@@ -283,6 +303,192 @@ export class YTreeService {
    */
   public refreshCheckedStatus() {
     this.rebuildCheckedStatus();
+  }
+
+  /**
+   * 移动节点（拖拽/API 调用）
+   * 移动后自动重建派生字段：isFirst/isLast/index/preId/nextId/level，并重算勾选状态
+   * @param {NodeId} sourceId 被移动节点id
+   * @param {NodeId} targetId 目标节点id
+   * @param {'inner' | 'prev' | 'next'} position 落点：inner=成为目标子节点，prev=插入目标之前，next=插入目标之后
+   * @returns {boolean} 是否发生实际变更
+   */
+  public moveNode(
+    sourceId: NodeId,
+    targetId: NodeId,
+    position: "inner" | "prev" | "next",
+  ): boolean {
+    if (!this.flatNodesMap || !this.levelMap) {
+      return false;
+    }
+
+    const source = this.flatNodesMap.get(sourceId);
+    const target = this.flatNodesMap.get(targetId);
+    if (!source || !target) {
+      return false;
+    }
+    if (sourceId === targetId) {
+      return false;
+    }
+    // 禁用节点不可移动，也不可作为移动目标
+    if (source.disabled || target.disabled) {
+      return false;
+    }
+    // 不能移动到自己的子孙节点下（会导致断链）
+    if (this.isDescendantOf(targetId, sourceId)) {
+      return false;
+    }
+    // 原地移动（落点与当前位置一致）视为无变更
+    if (this.isSamePosition(source, target, position)) {
+      return false;
+    }
+
+    const newLevel = position === "inner" ? target.level + 1 : target.level;
+
+    this.detachNode(source);
+    this.attachNode(source, target, position);
+    this.rebuildSubtreeLevel(source, newLevel);
+    this.rebuildLevelMap();
+    this.rebuildCheckedStatus();
+
+    return true;
+  }
+
+  /**
+   * 重命名节点
+   * @param {NodeId} id 节点id
+   * @param {string} newName 新名称（空白或与原名相同视为无变更）
+   * @returns {boolean} 是否发生实际变更
+   */
+  public renameNode(id: NodeId, newName: string): boolean {
+    const node = this.flatNodesMap?.get(id);
+    if (!node) {
+      return false;
+    }
+    const name = typeof newName === "string" ? newName.trim() : "";
+    if (!name || name === node.name) {
+      return false;
+    }
+    node.name = name;
+    return true;
+  }
+
+  /**
+   * 删除节点（含整棵子树）
+   * @param {NodeId} id 节点id
+   * @returns {Array<NodeId>} 被删除的节点id集合（含自身与全部子孙），未删除返回空数组
+   */
+  public removeNode(id: NodeId): Array<NodeId> {
+    if (!this.flatNodesMap || !this.levelMap) {
+      return [];
+    }
+    const node = this.flatNodesMap.get(id);
+    if (!node) {
+      return [];
+    }
+
+    // 收集整棵子树（含自身），供调用方清理外部状态
+    const removedIds = this.collectSubtreeNodeIds(id);
+
+    // 从父级兄弟链上摘除（根节点从 rootIds 摘除）
+    const siblings = this.getSiblingList(node);
+    if (siblings) {
+      const index = siblings.indexOf(id);
+      if (index >= 0) {
+        siblings.splice(index, 1);
+        this.refreshSiblingMeta(siblings, node.pId);
+      }
+    }
+
+    // 移除内部数据结构
+    for (const rid of removedIds) {
+      this.flatNodesMap.delete(rid);
+      this.nodeCheckedStateMap?.delete(rid);
+    }
+    this.rebuildLevelMap();
+    this.rebuildCheckedStatus();
+
+    return removedIds;
+  }
+
+  /**
+   * 新增节点（作为 parentId 的子节点）
+   * @param {NodeId} parentId 父节点id
+   * @param {Partial<YTreeNode>} data 节点数据（id 缺省自动生成；name 缺省为"新建节点"）
+   * @param {number} index 插入位置下标，-1 或越界时追加到末尾
+   * @returns {NodeId | null} 新节点id，失败返回 null
+   */
+  public addNode(
+    parentId: NodeId,
+    data: Partial<YTreeNode> = {},
+    index: number = -1,
+  ): NodeId | null {
+    if (!this.flatNodesMap || !this.levelMap) {
+      return null;
+    }
+    const parent = this.flatNodesMap.get(parentId);
+    if (!parent) {
+      return null;
+    }
+
+    const _data = { ...(data as Record<string, any>) };
+    let id = _data["id"] as NodeId;
+    if (id === undefined || id === null || id === "") {
+      id = this.generateNodeId();
+    }
+    if (this.flatNodesMap.has(id)) {
+      return null;
+    }
+
+    const childIds = parent.childIds;
+    const insertIndex =
+      index < 0 || index > childIds.length ? childIds.length : index;
+
+    const source: YTreeNode = {
+      ...(_data as YTreeNode),
+      id,
+      name: typeof _data["name"] === "string" ? _data["name"] : "新建节点",
+      children: [],
+    };
+
+    const node = this.createFlatNode(
+      source,
+      parent.id,
+      parent.level + 1,
+      insertIndex,
+      childIds.length + 1,
+      [],
+      childIds[insertIndex - 1] ?? this.ROOT_PARENT_ID,
+      childIds[insertIndex] ?? this.ROOT_PARENT_ID,
+    );
+
+    // createFlatNode 的受控判断依赖 this.checkIds（可能已被 rebuildCheckedStatus 汇总结果覆盖），
+    // 这里按初始受控语义显式修正新节点勾选状态
+    if (this.checkIdsControlled) {
+      node.checked = !!this.checkIds?.has(id);
+    } else if (typeof _data["checked"] === "boolean") {
+      node.checked = _data["checked"];
+    }
+    if (node.nocheck) {
+      node.checked = true;
+    }
+
+    childIds.splice(insertIndex, 0, id);
+    this.flatNodesMap.set(id, node);
+    this.registerLevelNode(node.level, id);
+    this.refreshSiblingMeta(childIds, parent.id);
+    this.rebuildCheckedStatus();
+
+    return id;
+  }
+
+  /**
+   * 自动生成节点id（时间戳 + 自增计数）
+   * @returns {NodeId}
+   */
+  private generateNodeId(): NodeId {
+    this.nodeIdCounter += 1;
+    return `__yt_new_${Date.now()}_${this.nodeIdCounter}`;
   }
 
   /**
@@ -604,7 +810,8 @@ export class YTreeService {
         : !!_source["selected"];
     const expanded =
       this.expandIds !== null ? this.expandIds.has(id) : !!_source["expanded"];
-    const hide = this.hideIds !== null ? this.hideIds.has(id) : !!_source["hide"];
+    const hide =
+      this.hideIds !== null ? this.hideIds.has(id) : !!_source["hide"];
     const checked = nocheck
       ? true
       : this.checkIds !== null
@@ -753,6 +960,175 @@ export class YTreeService {
     }
 
     return ids;
+  }
+
+  /**
+   * 获取节点的兄弟id集合（根节点返回根集合，非根返回父节点childIds）
+   * @param {YTreeModel} node
+   */
+  private getSiblingList(node: YTreeModel): Array<NodeId> | null {
+    if (node.isRoot) {
+      return this.rootIds;
+    }
+    const parent = this.flatNodesMap?.get(node.pId);
+    return parent ? parent.childIds : null;
+  }
+
+  /**
+   * 判断 id 是否为 ancestorId 的子孙节点
+   * @param {NodeId} id
+   * @param {NodeId} ancestorId
+   */
+  private isDescendantOf(id: NodeId, ancestorId: NodeId): boolean {
+    let current = this.flatNodesMap?.get(id);
+    const visited = new Set<NodeId>();
+    while (current && !visited.has(current.id)) {
+      visited.add(current.id);
+      if (current.pId === ancestorId) {
+        return true;
+      }
+      if (current.pId === this.ROOT_PARENT_ID) {
+        break;
+      }
+      current = this.flatNodesMap?.get(current.pId);
+    }
+    return false;
+  }
+
+  /**
+   * 判断目标落点是否为原地（无实际变化）
+   * - prev 原地：source 已紧邻 target 之前（source.nextId === target.id）
+   * - next 原地：source 已紧邻 target 之后（source.preId === target.id）
+   * - inner 原地：source 已是 target 的子节点
+   * @param {YTreeModel} source
+   * @param {YTreeModel} target
+   * @param {'inner' | 'prev' | 'next'} position
+   */
+  private isSamePosition(
+    source: YTreeModel,
+    target: YTreeModel,
+    position: "inner" | "prev" | "next",
+  ): boolean {
+    if (position === "inner") {
+      return source.pId === target.id;
+    }
+    if (position === "prev") {
+      return source.nextId === target.id;
+    }
+    return source.preId === target.id;
+  }
+
+  /**
+   * 从原父节点上摘除节点，并刷新原兄弟的派生字段
+   * @param {YTreeModel} node
+   */
+  private detachNode(node: YTreeModel): void {
+    const siblings = this.getSiblingList(node);
+    if (!siblings) {
+      return;
+    }
+    const index = siblings.indexOf(node.id);
+    if (index < 0) {
+      return;
+    }
+    siblings.splice(index, 1);
+    this.refreshSiblingMeta(siblings, node.pId);
+  }
+
+  /**
+   * 将节点挂载到目标位置（inner 追加为目标末子，prev/next 插入目标前/后）
+   * @param {YTreeModel} node
+   * @param {YTreeModel} target
+   * @param {'inner' | 'prev' | 'next'} position
+   */
+  private attachNode(
+    node: YTreeModel,
+    target: YTreeModel,
+    position: "inner" | "prev" | "next",
+  ): void {
+    if (position === "inner") {
+      const childIds = target.childIds;
+      childIds.push(node.id);
+      node.pId = target.id;
+      node.isRoot = false;
+      this.refreshSiblingMeta(childIds, target.id);
+      return;
+    }
+
+    const siblings = this.getSiblingList(target);
+    if (!siblings) {
+      return;
+    }
+    const targetIndex = siblings.indexOf(target.id);
+    const insertIndex = position === "prev" ? targetIndex : targetIndex + 1;
+    if (insertIndex < 0) {
+      return;
+    }
+    siblings.splice(insertIndex, 0, node.id);
+    node.pId = target.pId;
+    node.isRoot = target.isRoot;
+    this.refreshSiblingMeta(siblings, target.pId);
+  }
+
+  /**
+   * 重建被移动子树所有节点的 level（自顶向下）
+   * @param {YTreeModel} root 子树根节点
+   * @param {number} newLevel 子树根节点的新层级
+   */
+  private rebuildSubtreeLevel(root: YTreeModel, newLevel: number): void {
+    const stack: Array<{ node: YTreeModel; level: number }> = [
+      { node: root, level: newLevel },
+    ];
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+      current.node.level = current.level;
+      const childIds = current.node.childIds;
+      for (let index = childIds.length - 1; index >= 0; index--) {
+        const child = this.flatNodesMap?.get(childIds[index]);
+        if (child) {
+          stack.push({ node: child, level: current.level + 1 });
+        }
+      }
+    }
+  }
+
+  /**
+   * 重建 levelMap 与 maxLevel（移动后节点层级可能整体变化）
+   */
+  private rebuildLevelMap(): void {
+    if (!this.flatNodesMap) {
+      return;
+    }
+    this.levelMap = new Map();
+    this.maxLevel = 0;
+    this.flatNodesMap.forEach((node) => {
+      this.registerLevelNode(node.level, node.id);
+    });
+  }
+
+  /**
+   * 刷新兄弟节点的派生字段（index/isFirst/isLast/preId/nextId）
+   * @param {Array<NodeId>} ids 兄弟id集合（已按新顺序排列）
+   * @param {NodeId} parentId 父节点id（根节点为 ROOT_PARENT_ID）
+   */
+  private refreshSiblingMeta(ids: Array<NodeId>, parentId: NodeId): void {
+    const len = ids.length;
+    for (let index = 0; index < len; index++) {
+      const node = this.flatNodesMap?.get(ids[index]);
+      if (!node) {
+        continue;
+      }
+      node.pId = parentId;
+      node.isRoot = parentId === this.ROOT_PARENT_ID;
+      node.index = index;
+      node.isFirst = index === 0;
+      node.isLast = index === len - 1;
+      node.preId = ids[index - 1] ?? this.ROOT_PARENT_ID;
+      node.nextId = ids[index + 1] ?? this.ROOT_PARENT_ID;
+    }
   }
 
   /**

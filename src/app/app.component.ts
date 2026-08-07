@@ -51,6 +51,28 @@ export class AppComponent {
     console.log('checkedChange', payload.id, payload.checked);
   }
 
+  onNodeChange(payload: any) {
+    console.log(
+      'nodeChange',
+      payload.sourceId,
+      '->',
+      payload.targetId,
+      payload.position
+    );
+  }
+
+  onRename(payload: any) {
+    console.log('rename', payload.id, payload.oldName, '->', payload.newName);
+  }
+
+  onRemove(payload: any) {
+    console.log('remove', payload.id);
+  }
+
+  onAdd(payload: any) {
+    console.log('add', payload.id, 'parent', payload.parentId);
+  }
+
   printChecked() {
     console.log('checkedList', this.tree?.getCheckedList());
   }

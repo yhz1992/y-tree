@@ -4,6 +4,8 @@
   [style.height.px]="height"
   (scroll)="onVirtualScroll($event)"
 >
+  <!-- 自定义节点 DOM 模板投影（对标 zTree addDiyDom，使用方传入 ng-template 并添加 nodeExtra 引用） -->
+  <ng-content select="ng-template[nodeExtra]"></ng-content>
   <div
     class="y-tree-virtual-spacer"
     [style.height.px]="total * ROW_HEIGHT"
@@ -20,10 +22,27 @@
         'is-first': item.node.isFirst,
         'is-last': item.node.isLast,
         'is-selected': item.node.selected,
-        'is-disabled': item.node.disabled
+        'is-disabled': item.node.disabled,
+        'is-dragging': draggingId === item.id,
+        'is-drop-inner':
+          dropTarget &&
+          dropTarget.id === item.id &&
+          dropTarget.position === 'inner',
+        'is-drop-before':
+          dropTarget &&
+          dropTarget.id === item.id &&
+          dropTarget.position === 'prev',
+        'is-drop-after':
+          dropTarget &&
+          dropTarget.id === item.id &&
+          dropTarget.position === 'next'
       }"
+      [attr.draggable]="draggable && !item.node.disabled"
+      (dragstart)="onDragStart($event, item.id)"
+      (dragover)="onDragOver($event, item.id)"
+      (drop)="onDrop($event, item.id)"
+      (dragend)="onDragEnd()"
       (click)="onClick($event, item.id)"
-      (dblclick)="onDbClick($event, item.id)"
       (contextmenu)="onContextMenu($event, item.id)"
     >
       <span
@@ -71,9 +90,70 @@
         ></i>
       </label>
 
-      <span class="y-tree-title" [ngClass]="{ 'is-link': showLine }">
+      <input
+        *ngIf="editingId === item.id"
+        class="y-tree-edit-input"
+        [value]="editValue"
+        autofocus
+        (input)="onEditInput($event)"
+        (keydown.enter)="commitRename($event)"
+        (keydown.escape)="cancelEdit()"
+        (blur)="commitRename($event)"
+        (click)="$event.stopPropagation()"
+      />
+      <span
+        *ngIf="editingId !== item.id"
+        class="y-tree-title"
+        [ngClass]="{ 'is-link': showLine }"
+        (dblclick)="onDbClick($event, item.id); startEdit($event, item.id)"
+      >
         {{ item.node.name }}
       </span>
+
+      <span
+        *ngIf="editable && editingId !== item.id"
+        class="y-tree-actions-wrap"
+      >
+        <span class="y-tree-actions">
+          <i
+            *ngIf="showRenameBtn"
+            class="y-tree-action-btn fa-solid fa-pen"
+            (click)="$event.stopPropagation(); startEdit($event, item.id)"
+          ></i>
+          <i
+            *ngIf="showAddBtn"
+            class="y-tree-action-btn fa-solid fa-plus"
+            (click)="$event.stopPropagation(); handleAddClick($event, item.id)"
+          ></i>
+          <i
+            *ngIf="showRemoveBtn"
+            class="y-tree-action-btn is-danger fa-solid fa-trash"
+            (click)="
+              $event.stopPropagation(); handleRemoveClick($event, item.id)
+            "
+          ></i>
+        </span>
+
+        <span *ngIf="confirmRemoveId === item.id" class="y-tree-remove-confirm">
+          <span class="y-tree-remove-confirm-text">确认删除该节点？</span>
+          <button
+            class="y-tree-remove-confirm-btn"
+            (click)="$event.stopPropagation(); doRemove($event, item.id)"
+          >
+            确认删除
+          </button>
+          <button
+            class="y-tree-remove-cancel-btn"
+            (click)="$event.stopPropagation(); closeConfirm()"
+          >
+            取消
+          </button>
+        </span>
+      </span>
+
+      <ng-container
+        *ngTemplateOutlet="nodeExtraTemplate; context: { $implicit: item.node }"
+      ></ng-container>
     </div>
   </div>
 </div>
