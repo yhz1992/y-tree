@@ -1,12 +1,27 @@
 import { Component, ViewChild } from '@angular/core';
 import { YTreeComponent } from 'y-tree';
 
+const smallData: Array<any> = [
+  {
+    id: 'a',
+    name: 'A',
+    expanded: true,
+    children: [
+      { id: 'a-1', name: 'A-1', children: [] },
+      { id: 'a-2', name: 'A-2', children: [] },
+    ],
+  },
+  { id: 'b', name: 'B', children: [] },
+  { id: 'c', name: 'C', children: [] },
+];
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css'],
 })
 export class AppComponent {
+  smallData = smallData;
   datasource: Array<any> = [
     {
       id: '1',
@@ -29,57 +44,76 @@ export class AppComponent {
     { id: '3', name: '节点3', disabled: true, children: [] },
   ];
 
-  @ViewChild(YTreeComponent) tree!: YTreeComponent;
+  @ViewChild('apiTree') apiTree!: YTreeComponent;
 
-  onClick(payload: any) {
-    console.log('click', payload.id);
+  log1 = '（按住 Ctrl 拖拽节点到其他位置观察复制效果）';
+  log2 = '（拖拽节点观察回调日志）';
+  log3 = '（只有叶子节点可拖，不能拖到 B 上）';
+  log4 = '（点击下方按钮执行程序化移动/复制）';
+
+  // 程序化 API：每次操作前重置数据（保证可重复演示且效果明显）
+  apiTreeData: Array<any> = [...smallData];
+
+  allowDrag = (node: any) => node.childIds.length === 0;
+  allowDrop = (_sid: any, tid: any, _pos: any) => tid !== 'b';
+
+  onCopyNodeChange(e: any) {
+    this.log1 = `nodeChange: ${e.sourceId} -> ${e.targetId} (${e.position})`;
+  }
+  onCopyDrop(e: any) {
+    this.log1 += ` | moveType=${e.moveType}`;
   }
 
-  onDbClick(payload: any) {
-    console.log('dbClick', payload.id);
+  onDrag(e: any) {
+    this.log2 =
+      `drag id=${e.sourceId} copy=${e.isCopy}\n` + this.log2.slice(0, 400);
+  }
+  onDragMove(e: any) {
+    this.log2 =
+      `dragMove ${e.sourceId} -> ${e.targetId} (${e.position})\n` +
+      this.log2.slice(0, 400);
+  }
+  onDrop(e: any) {
+    this.log2 =
+      `drop ${e.sourceId} -> ${e.targetId} (${e.position}) copy=${e.isCopy}\n` +
+      this.log2.slice(0, 400);
+  }
+  onCbNodeChange(e: any) {
+    this.log2 =
+      `nodeChange ${e.sourceId} -> ${e.targetId} (${e.position})\n` +
+      this.log2.slice(0, 400);
   }
 
-  onContextMenu(payload: any) {
-    console.log('contextMenu', payload.id);
+  onCtlNodeChange(e: any) {
+    this.log3 = `nodeChange: ${e.sourceId} -> ${e.targetId} (${e.position})`;
   }
 
-  onExpandChange(payload: any) {
-    console.log('expandChange', payload.id, payload.expand);
+  apiMove() {
+    this.apiTreeData = [...smallData];
+    // 等待变更检测重建 service 后再执行操作
+    setTimeout(() => {
+      const ok = this.apiTree?.moveNode('b', 'a', 'prev');
+      this.log4 = `moveNode("b","a","prev") => ${ok}`;
+    });
+  }
+  apiCopy() {
+    this.apiTreeData = [...smallData];
+    setTimeout(() => {
+      const newId = this.apiTree?.copyNode('c', 'a', 'next');
+      this.log4 = `copyNode("c","a","next") => newId=${newId}`;
+    });
   }
 
-  onCheckedChange(payload: any) {
-    console.log('checkedChange', payload.id, payload.checked);
+  onNodeChange(e: any) {
+    console.log('nodeChange', e.sourceId, '->', e.targetId, e.position);
+  }
+  onDragLog(e: any) {
+    console.log('drag', e.sourceId);
+  }
+  onDropLog(e: any) {
+    console.log('drop', e.sourceId, '->', e.targetId, e.moveType);
   }
 
-  onNodeChange(payload: any) {
-    console.log(
-      'nodeChange',
-      payload.sourceId,
-      '->',
-      payload.targetId,
-      payload.position
-    );
-  }
-
-  onRename(payload: any) {
-    console.log('rename', payload.id, payload.oldName, '->', payload.newName);
-  }
-
-  onRemove(payload: any) {
-    console.log('remove', payload.id);
-  }
-
-  onAdd(payload: any) {
-    console.log('add', payload.id, 'parent', payload.parentId);
-  }
-
-  printChecked() {
-    console.log('checkedList', this.tree?.getCheckedList());
-  }
-
-  /**
-   * 生成 10 万节点（6 层）演示数据
-   */
   generateLargeData(): void {
     this.datasource = this.buildLargeData();
   }

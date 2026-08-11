@@ -194,6 +194,49 @@ export interface YTreeAddEvent extends YTreeNodeEvent {
 }
 
 /**
+ * 拖拽事件（dragstart 时触发）
+ * @extends {YTreeNodeEvent}
+ */
+export interface YTreeDragEvent extends YTreeNodeEvent {
+  /** 被拖拽节点id */
+  sourceId: string | number;
+  /** 是否复制模式（Ctrl 按下 + isCopy 开启） */
+  isCopy: boolean;
+}
+
+/**
+ * 拖拽移动事件（dragover 时持续触发）
+ * @extends {YTreeNodeEvent}
+ */
+export interface YTreeDragMoveEvent extends YTreeNodeEvent {
+  /** 被拖拽节点id */
+  sourceId: string | number;
+  /** 目标节点id */
+  targetId: string | number;
+  /** 当前落点 */
+  position: "inner" | "prev" | "next";
+  /** 是否复制模式 */
+  isCopy: boolean;
+}
+
+/**
+ * 拖拽放置事件（drop 时触发）
+ * @extends {YTreeNodeEvent}
+ */
+export interface YTreeDropEvent extends YTreeNodeEvent {
+  /** 被拖拽节点id */
+  sourceId: string | number;
+  /** 目标节点id */
+  targetId: string | number;
+  /** 落点 */
+  position: "inner" | "prev" | "next";
+  /** 是否复制模式 */
+  isCopy: boolean;
+  /** 移动类型：move=移动，copy=复制 */
+  moveType: "move" | "copy";
+}
+
+/**
  * 节点移动（拖拽）事件
  * @extends {YTreeNodeEvent}
  */

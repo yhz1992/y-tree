@@ -355,6 +355,110 @@ export class YTreeService {
   }
 
   /**
+   * 复制节点（含整棵子树）到目标位置
+   * 复制后自动为新子树生成新id并重建所有派生字段与勾选状态
+   * @param {NodeId} sourceId 被复制节点id
+   * @param {NodeId} targetId 目标节点id
+   * @param {'inner' | 'prev' | 'next'} position 落点
+   * @returns {NodeId | null} 新子树根节点id，失败返回 null
+   */
+  public copyNode(
+    sourceId: NodeId,
+    targetId: NodeId,
+    position: "inner" | "prev" | "next",
+  ): NodeId | null {
+    if (!this.flatNodesMap || !this.levelMap) {
+      return null;
+    }
+
+    const source = this.flatNodesMap.get(sourceId);
+    const target = this.flatNodesMap.get(targetId);
+    if (!source || !target) {
+      return null;
+    }
+    if (sourceId === targetId) {
+      return null;
+    }
+    if (source.disabled || target.disabled) {
+      return null;
+    }
+    // 不能复制到自己的子孙节点下
+    if (this.isDescendantOf(targetId, sourceId)) {
+      return null;
+    }
+
+    // 收集源子树全部id（按层级、同层按顺序排列以保证复制后childIds顺序正确）
+    const sourceIds = this.collectSubtreeNodeIds(sourceId);
+    const oldIdToNewId = new Map<NodeId, NodeId>();
+    const newNodes: Array<YTreeModel> = [];
+
+    for (const oldId of sourceIds) {
+      const old = this.flatNodesMap.get(oldId);
+      if (!old) {
+        continue;
+      }
+      const newId = this.generateNodeId();
+      oldIdToNewId.set(oldId, newId);
+
+      const newNode: YTreeModel = {
+        ...old,
+        id: newId,
+        pId: "", // 先占位，稍后统一映射
+        isRoot: false,
+        childIds: [], // 先占位
+        preId: "",
+        nextId: "",
+        index: 0,
+        isFirst: false,
+        isLast: false,
+        level: 0, // 稍后由rebuildSubtreeLevel计算
+      };
+      newNodes.push(newNode);
+      this.flatNodesMap?.set(newId, newNode);
+    }
+
+    // 映射父子关系与childIds
+    for (const newNode of newNodes) {
+      const oldId = sourceIds[newNodes.indexOf(newNode)];
+      const old = this.flatNodesMap.get(oldId);
+      if (old) {
+        // pId映射
+        if (oldId === sourceId) {
+          // 根节点：pId由attachNode决定
+          newNode.pId = "";
+        } else if (oldIdToNewId.has(old.pId)) {
+          newNode.pId = oldIdToNewId.get(old.pId) ?? "";
+        }
+        // childIds映射
+        newNode.childIds = old.childIds
+          .map((cid) => oldIdToNewId.get(cid) ?? "")
+          .filter((id) => id !== "");
+      }
+    }
+
+    // 将新子树根挂载到目标位置
+    const rootNewId = oldIdToNewId.get(sourceId);
+    if (rootNewId === undefined) {
+      // 回滚
+      newNodes.forEach((n) => this.flatNodesMap?.delete(n.id));
+      return null;
+    }
+    const rootNewNode = this.flatNodesMap.get(rootNewId);
+    if (!rootNewNode) {
+      newNodes.forEach((n) => this.flatNodesMap?.delete(n.id));
+      return null;
+    }
+
+    const newLevel = position === "inner" ? target.level + 1 : target.level;
+    this.attachNode(rootNewNode, target, position);
+    this.rebuildSubtreeLevel(rootNewNode, newLevel);
+    this.rebuildLevelMap();
+    this.rebuildCheckedStatus();
+
+    return rootNewId;
+  }
+
+  /**
    * 重命名节点
    * @param {NodeId} id 节点id
    * @param {string} newName 新名称（空白或与原名相同视为无变更）

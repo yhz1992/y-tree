@@ -1,5 +1,73 @@
 <div class="app">
-  <h1>y-tree · Angular</h1>
+  <h1>y-tree · Angular — P2 拖拽能力 demo</h1>
+
+  <div class="demo-block">
+    <h3>拖拽复制（isCopy + Ctrl）</h3>
+    <p class="demo-tip">{{ log1 }}</p>
+    <div class="app-card" style="height: 200px">
+      <y-tree
+        [datasource]="smallData"
+        [showLine]="true"
+        [expandAll]="true"
+        [draggable]="true"
+        [isCopy]="true"
+        (nodeChange)="onCopyNodeChange($event)"
+        (drop)="onCopyDrop($event)"
+      ></y-tree>
+    </div>
+  </div>
+
+  <div class="demo-block">
+    <h3>拖拽回调（drag / dragMove / drop / nodeChange）</h3>
+    <pre class="demo-log">{{ log2 }}</pre>
+    <div class="app-card" style="height: 200px">
+      <y-tree
+        [datasource]="smallData"
+        [showLine]="true"
+        [expandAll]="true"
+        [draggable]="true"
+        (drag)="onDrag($event)"
+        (dragMove)="onDragMove($event)"
+        (drop)="onDrop($event)"
+        (nodeChange)="onCbNodeChange($event)"
+      ></y-tree>
+    </div>
+  </div>
+
+  <div class="demo-block">
+    <h3>allowDrag / allowDrop 精细控制</h3>
+    <p class="demo-tip">{{ log3 }}</p>
+    <div class="app-card" style="height: 200px">
+      <y-tree
+        [datasource]="smallData"
+        [showLine]="true"
+        [expandAll]="true"
+        [draggable]="true"
+        [allowDrag]="allowDrag"
+        [allowDrop]="allowDrop"
+        (nodeChange)="onCtlNodeChange($event)"
+      ></y-tree>
+    </div>
+  </div>
+
+  <div class="demo-block">
+    <h3>程序化 API（moveNode / copyNode）</h3>
+    <p class="demo-tip">{{ log4 }}</p>
+    <div class="app-card" style="height: 200px">
+      <y-tree
+        #apiTree
+        [datasource]="apiTreeData"
+        [showLine]="true"
+        [expandAll]="true"
+      ></y-tree>
+    </div>
+    <p class="demo-actions">
+      <button (click)="apiMove()">moveNode(B → A prev)</button>
+      <button (click)="apiCopy()">copyNode(C → A next)</button>
+    </p>
+  </div>
+
+  <h2 style="margin-top: 24px">完整功能（含编辑）</h2>
   <div class="app-card">
     <y-tree
       [datasource]="datasource"
@@ -7,20 +75,14 @@
       [showLine]="true"
       [expandAll]="true"
       [draggable]="true"
+      [isCopy]="true"
       [editable]="true"
-      (click)="onClick($event)"
-      (dbClick)="onDbClick($event)"
-      (contextMenu)="onContextMenu($event)"
-      (expandChange)="onExpandChange($event)"
-      (checkedChange)="onCheckedChange($event)"
       (nodeChange)="onNodeChange($event)"
-      (rename)="onRename($event)"
-      (remove)="onRemove($event)"
-      (add)="onAdd($event)"
+      (drag)="onDragLog($event)"
+      (drop)="onDropLog($event)"
     ></y-tree>
   </div>
   <p>
     <button (click)="generateLargeData()">生成 10 万节点（6 层）</button>
-    <button (click)="printChecked()">打印已勾选节点</button>
   </p>
 </div>

@@ -19,6 +19,9 @@ import type {
   YTreeNodeEvent,
   YTreeRemoveEvent,
   YTreeRenameEvent,
+  YTreeDragEvent,
+  YTreeDragMoveEvent,
+  YTreeDropEvent,
 } from '../common/model';
 
 /**
@@ -55,6 +58,34 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * 节点是否可拖拽
    */
   @Input() draggable: boolean = false;
+  /**
+   * Ctrl+拖拽时复制而非移动
+   */
+  @Input() isCopy: boolean = false;
+  /**
+   * 允许拖拽节点判定，返回 false 阻止拖拽
+   */
+  @Input() allowDrag?: (node: YTreeModel) => boolean;
+  /**
+   * 允许落点判定，返回 false 阻止落点
+   */
+  @Input() allowDrop?: (
+    sourceId: string | number,
+    targetId: string | number,
+    position: 'inner' | 'prev' | 'next'
+  ) => boolean;
+  /**
+   * 拖拽生效最小移动距离（px）
+   */
+  @Input() minMoveSize: number = 5;
+  /**
+   * 拖拽开始前置拦截，返回 false 取消
+   */
+  @Input() beforeDrag?: (payload: YTreeDragEvent) => boolean;
+  /**
+   * 拖拽放置前置拦截，返回 false 取消
+   */
+  @Input() beforeDrop?: (payload: YTreeDropEvent) => boolean;
   /**
    * 是否启用编辑能力（重命名/删除/新增按钮）
    */
@@ -148,6 +179,18 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   @Output() nodeChange = new EventEmitter<any>();
   /**
+   * 拖拽开始事件
+   */
+  @Output() drag = new EventEmitter<any>();
+  /**
+   * 拖拽移动中事件
+   */
+  @Output() dragMove = new EventEmitter<any>();
+  /**
+   * 拖拽放置事件
+   */
+  @Output() drop = new EventEmitter<any>();
+  /**
    * 节点重命名事件
    */
   @Output() rename = new EventEmitter<any>();
@@ -197,6 +240,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * 编辑状态：待确认删除的节点id
    */
   protected confirmRemoveId: NodeId | null = null;
+
+  /**
+   * 拖拽起始位置（用于 minMoveSize 判断）
+   */
+  private dragStartPos: { x: number; y: number } = { x: 0, y: 0 };
 
   /**
    * 虚拟滚动行高（px），固定行高是虚拟滚动的前提
@@ -515,9 +563,20 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     if (!node || node.disabled) {
       return;
     }
+    // allowDrag 精细控制
+    if (this.allowDrag && !this.allowDrag(node)) {
+      return;
+    }
+    // beforeDrag 前置拦截
+    if (
+      this.beforeDrag?.({ event, id, sourceId: id, isCopy: false }) === false
+    ) {
+      return;
+    }
+    this.dragStartPos = { x: event.clientX, y: event.clientY };
     this.draggingId = id;
     this.ref.markForCheck();
-    // 拖拽时收起非叶子节点（延迟到拖拽会话建立后执行，避免 dragstart 期间同步 DOM 变化中断拖拽）
+    // 拖拽时收起非叶子节点（延迟到拖拽会话建立后执行）
     if (node.childIds.length > 0 && this.expandedIds.has(id)) {
       const collapseId = id;
       window.setTimeout(() => {
@@ -527,10 +586,10 @@ export class YTreeComponent implements OnChanges, OnDestroy {
         }
       }, 0);
     }
+    const copyMode = this.isCopy && (event.ctrlKey || event.metaKey);
     if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.effectAllowed = copyMode ? 'copy' : 'move';
       event.dataTransfer.setData('text/plain', String(id));
-      // 拖拽预览：避免虚拟滚动卸载源节点导致拖拽中断
       try {
         event.dataTransfer.setDragImage(
           event.currentTarget as HTMLElement,
@@ -541,6 +600,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
         /* 部分浏览器不支持 setDragImage */
       }
     }
+    this.drag.emit({ event, id, sourceId: id, isCopy: copyMode });
   }
 
   /**
@@ -556,19 +616,35 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     if (!node || node.disabled) {
       return;
     }
-    event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move';
+    // minMoveSize：实际移动距离不足时不显示落点
+    const dx = event.clientX - this.dragStartPos.x;
+    const dy = event.clientY - this.dragStartPos.y;
+    if (
+      this.minMoveSize > 0 &&
+      Math.sqrt(dx * dx + dy * dy) < this.minMoveSize
+    ) {
+      return;
     }
-    this.dropTarget = {
-      id,
-      position: this.calcDropPosition(event, node.childIds.length > 0),
-    };
+    event.preventDefault();
+    const copyMode = this.isCopy && (event.ctrlKey || event.metaKey);
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = copyMode ? 'copy' : 'move';
+    }
+    const position = this.calcDropPosition(event, node.childIds.length > 0);
+    this.dropTarget = { id, position };
     this.ref.markForCheck();
+    this.dragMove.emit({
+      event,
+      id: this.draggingId,
+      sourceId: this.draggingId,
+      targetId: id,
+      position,
+      isCopy: copyMode,
+    });
   }
 
   /**
-   * 节点拖拽放下（执行移动并通知外部）
+   * 节点拖拽放下（执行移动/复制并通知外部）
    * @param event
    * @param id
    */
@@ -583,11 +659,52 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     if (!target || target.id !== id) {
       return;
     }
-    const moved = this.service?.moveNode(sourceId, id, target.position);
-    if (moved) {
-      this.nodeChange.emit({
+    const copyMode = this.isCopy && (event.ctrlKey || event.metaKey);
+    const moveType: 'move' | 'copy' = copyMode ? 'copy' : 'move';
+
+    // allowDrop 精细控制
+    if (this.allowDrop && !this.allowDrop(sourceId, id, target.position)) {
+      return;
+    }
+    // beforeDrop 前置拦截
+    if (
+      this.beforeDrop?.({
         event,
         id: sourceId,
+        sourceId,
+        targetId: id,
+        position: target.position,
+        isCopy: copyMode,
+        moveType,
+      }) === false
+    ) {
+      return;
+    }
+
+    // 执行移动或复制
+    let ok = false;
+    let resultId: NodeId | null = null;
+    if (copyMode) {
+      resultId = this.service?.copyNode(sourceId, id, target.position) ?? null;
+      ok = resultId != null;
+    } else {
+      ok = this.service?.moveNode(sourceId, id, target.position) ?? false;
+      resultId = sourceId;
+    }
+
+    if (ok) {
+      this.drop.emit({
+        event,
+        id: resultId ?? sourceId,
+        sourceId,
+        targetId: id,
+        position: target.position,
+        isCopy: copyMode,
+        moveType,
+      });
+      this.nodeChange.emit({
+        event,
+        id: resultId ?? sourceId,
         sourceId,
         targetId: id,
         position: target.position,
@@ -746,6 +863,32 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   public getCheckedList(): Array<YTreeModel> {
     return this.service?.getCheckedList() ?? [];
+  }
+
+  /**
+   * 程序化移动节点
+   */
+  public moveNode(
+    sourceId: NodeId,
+    targetId: NodeId,
+    position: 'inner' | 'prev' | 'next'
+  ): boolean {
+    const ok = this.service?.moveNode(sourceId, targetId, position) ?? false;
+    if (ok) this.updateView();
+    return ok;
+  }
+
+  /**
+   * 程序化复制节点，返回新节点id或null
+   */
+  public copyNode(
+    sourceId: NodeId,
+    targetId: NodeId,
+    position: 'inner' | 'prev' | 'next'
+  ): NodeId | null {
+    const newId = this.service?.copyNode(sourceId, targetId, position) ?? null;
+    if (newId != null) this.updateView();
+    return newId;
   }
 
   ngOnDestroy(): void {
