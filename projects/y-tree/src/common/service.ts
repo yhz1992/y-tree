@@ -7,6 +7,21 @@ import type {
   YTreeNode,
 } from "./model";
 
+/**
+ * 节点直接子节点的状态计数（增量更新用）
+ * checked = 子节点中状态为 checked/indeterminate 的数量
+ * unchecked = 子节点中状态为 unchecked/indeterminate 的数量
+ */
+type ChildStateCount = {
+  checked: number;
+  unchecked: number;
+};
+
+/**
+ * 节点勾选状态（"" 表示节点不存在，用于新增/删除节点的计数增减）
+ */
+type CheckedStateLike = YTreeCheckedState | "";
+
 export class YTreeService {
   constructor(
     nodes: Array<YTreeNode | YTreeFlatNode> = [],
@@ -51,6 +66,18 @@ export class YTreeService {
    * 节点勾选状态缓存
    */
   private nodeCheckedStateMap: Map<NodeId, YTreeCheckedState> | null = null;
+
+  /**
+   * @type { Map<NodeId, ChildStateCount> | null }
+   * 每个非叶子节点直接子节点的状态计数（增量更新用，父节点状态可 O(1) 解析）
+   */
+  private childStateCountMap: Map<NodeId, ChildStateCount> | null = null;
+
+  /**
+   * @type {boolean}
+   * 叶子汇总是否因结构变更而失效（惰性重算标志，getTreeCheckedSummary 读取时重算）
+   */
+  private leafStatsDirty: boolean = false;
 
   /**
    * @type { Array<NodeId> }
@@ -138,6 +165,8 @@ export class YTreeService {
     this.flatNodesMap = new Map();
     this.levelMap = new Map();
     this.nodeCheckedStateMap = new Map();
+    this.childStateCountMap = new Map();
+    this.leafStatsDirty = false;
     this.rootIds = [];
     this.maxLevel = 0;
     this.treeLeafTotal = 0;
@@ -220,6 +249,7 @@ export class YTreeService {
    * 获取整树勾选汇总
    */
   public getTreeCheckedSummary(): YTreeCheckedSummary {
+    this.ensureLeafStats();
     const state = this.resolveCheckedState(
       this.treeLeafChecked,
       this.treeLeafTotal,
@@ -345,11 +375,21 @@ export class YTreeService {
 
     const newLevel = position === "inner" ? target.level + 1 : target.level;
 
+    // 搬运语义：子树内部状态不变，仅同步原父/新父的计数并沿祖先链增量传播
+    const sourceState = this.getNodeCheckedState(sourceId);
+
+    // 结构变更：叶子汇总标记失效（读取时惰性重算）
+    this.leafStatsDirty = true;
+
     this.detachNode(source);
+    // 从原父移除：原父计数减去 source 贡献，向上传播
+    this.propagateCheckedState(sourceId, sourceState, "");
+
     this.attachNode(source, target, position);
     this.rebuildSubtreeLevel(source, newLevel);
     this.rebuildLevelMap();
-    this.rebuildCheckedStatus();
+    // 挂到新父：新父计数加上 source 贡献，向上传播
+    this.propagateCheckedState(sourceId, "", sourceState);
 
     return true;
   }
@@ -453,7 +493,10 @@ export class YTreeService {
     this.attachNode(rootNewNode, target, position);
     this.rebuildSubtreeLevel(rootNewNode, newLevel);
     this.rebuildLevelMap();
-    this.rebuildCheckedStatus();
+    // 结构变更：叶子汇总标记失效（读取时惰性重算）
+    this.leafStatsDirty = true;
+    // 新子树局部重建（全新子树：内部状态重算，统计由惰性重算兜底）+ 沿祖先链向上传播
+    this.rebuildSubtreeCheckedStatus(rootNewId, true);
 
     return rootNewId;
   }
@@ -494,6 +537,9 @@ export class YTreeService {
     // 收集整棵子树（含自身），供调用方清理外部状态
     const removedIds = this.collectSubtreeNodeIds(id);
 
+    // 结构变更：叶子汇总标记失效（读取时惰性重算）
+    this.leafStatsDirty = true;
+
     // 从父级兄弟链上摘除（根节点从 rootIds 摘除）
     const siblings = this.getSiblingList(node);
     if (siblings) {
@@ -504,13 +550,17 @@ export class YTreeService {
       }
     }
 
+    // 增量传播：被删子树根从父节点计数中移除（需在删除 map 之前执行）
+    this.propagateCheckedState(id, this.getNodeCheckedState(id), "");
+
     // 移除内部数据结构
     for (const rid of removedIds) {
       this.flatNodesMap.delete(rid);
       this.nodeCheckedStateMap?.delete(rid);
+      this.childStateCountMap?.delete(rid);
+      this.checkIds?.delete(rid);
     }
     this.rebuildLevelMap();
-    this.rebuildCheckedStatus();
 
     return removedIds;
   }
@@ -581,7 +631,16 @@ export class YTreeService {
     this.flatNodesMap.set(id, node);
     this.registerLevelNode(node.level, id);
     this.refreshSiblingMeta(childIds, parent.id);
-    this.rebuildCheckedStatus();
+
+    // 新节点状态（叶子，nocheck 视为勾选）
+    const newState = this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
+    this.applyStateToNode(node, newState);
+
+    // 结构变更：叶子汇总标记失效（读取时惰性重算）
+    this.leafStatsDirty = true;
+
+    // 增量传播：父节点计数加上新节点贡献，向上传播
+    this.propagateCheckedState(id, "", newState);
 
     return id;
   }
@@ -602,6 +661,8 @@ export class YTreeService {
     this.flatNodesMap = null;
     this.levelMap = null;
     this.nodeCheckedStateMap = null;
+    this.childStateCountMap = null;
+    this.leafStatsDirty = false;
     this.checkIds = null;
     this.selectedIds = null;
     this.nocheckIds = null;
@@ -976,6 +1037,10 @@ export class YTreeService {
         return false;
       }
       changed = this.applyNodeChecked(targetNode, checked);
+      if (changed) {
+        // 单节点增量更新：重算该节点最终状态（叶子按 resolved，非叶子按子节点计数）并沿祖先链传播
+        this.applySingleNodeChecked(targetNode);
+      }
     } else {
       const subtreeIds = this.collectSubtreeNodeIds(id);
       const len = subtreeIds.length;
@@ -990,10 +1055,11 @@ export class YTreeService {
           changed = true;
         }
       }
-    }
 
-    if (changed) {
-      this.rebuildCheckedStatus();
+      if (changed) {
+        // 子树局部重建（自底向上）+ 叶子统计同步 + 沿祖先链向上传播
+        this.rebuildSubtreeCheckedStatus(id);
+      }
     }
 
     return changed;
@@ -1236,10 +1302,349 @@ export class YTreeService {
   }
 
   /**
-   * 重建整树勾选状态（自底向上）
+   * 判断节点是否为叶子（无有效子节点）
+   * @param {YTreeModel} node
+   */
+  private isLeafNode(node: YTreeModel): boolean {
+    const childIds = node.childIds || [];
+    for (let index = 0; index < childIds.length; index++) {
+      if (this.flatNodesMap?.has(childIds[index])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * 扫描直接子节点状态，计算状态计数（增量更新用）
+   * @param {YTreeModel} node
+   */
+  private computeChildStateCount(node: YTreeModel): ChildStateCount {
+    const counts: ChildStateCount = { checked: 0, unchecked: 0 };
+    const childIds = node.childIds || [];
+    for (let index = 0; index < childIds.length; index++) {
+      const childId = childIds[index];
+      if (!this.flatNodesMap?.has(childId)) {
+        continue;
+      }
+      const childState = this.getNodeCheckedState(childId);
+      if (childState === "checked" || childState === "indeterminate") {
+        counts.checked++;
+      }
+      if (childState === "unchecked" || childState === "indeterminate") {
+        counts.unchecked++;
+      }
+    }
+    return counts;
+  }
+
+  /**
+   * 根据直接子节点状态计数解析节点状态
+   * 计数为空（无有效子节点）时按叶子逻辑处理（nocheck 视为勾选）
+   * @param {YTreeModel} node
+   * @param {ChildStateCount | undefined} counts
+   */
+  private resolveStateByCounts(
+    node: YTreeModel,
+    counts: ChildStateCount | undefined,
+  ): YTreeCheckedState {
+    if (!counts || (counts.checked === 0 && counts.unchecked === 0)) {
+      return this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
+    }
+    if (counts.unchecked === 0) {
+      return "checked";
+    }
+    if (counts.checked === 0) {
+      return "unchecked";
+    }
+    return "indeterminate";
+  }
+
+  /**
+   * 应用节点状态（写 checked/halfChecked/状态缓存，并按需同步 checkIds）
+   * @param {YTreeModel} node
+   * @param {YTreeCheckedState} state
+   * @param {Map<NodeId, YTreeCheckedState> | null} stateMap 指定状态缓存（全量重建时传入局部map）
+   * @param {boolean} syncCheckIds 是否同步维护 checkIds（全量重建由调用方整体覆盖，传 false）
+   */
+  private applyStateToNode(
+    node: YTreeModel,
+    state: YTreeCheckedState,
+    stateMap: Map<NodeId, YTreeCheckedState> | null = null,
+    syncCheckIds: boolean = true,
+  ): void {
+    const map = stateMap || this.nodeCheckedStateMap;
+    if (!map) {
+      return;
+    }
+
+    const preChecked = map.get(node.id) === "checked";
+    if (state === "checked") {
+      node.checked = true;
+      node.halfChecked = false;
+    } else if (state === "unchecked") {
+      node.checked = false;
+      node.halfChecked = false;
+    } else {
+      node.checked = false;
+      node.halfChecked = true;
+    }
+    map.set(node.id, state);
+
+    if (syncCheckIds && this.checkIds && preChecked !== !!node.checked) {
+      if (node.checked) {
+        this.checkIds.add(node.id);
+      } else {
+        this.checkIds.delete(node.id);
+      }
+    }
+  }
+
+  /**
+   * 状态计数增减（"" 空状态无贡献，用于新增/删除节点的计数变化）
+   * @param {ChildStateCount} counts
+   * @param {CheckedStateLike} state
+   * @param {number} delta
+   */
+  private adjustStateCount(
+    counts: ChildStateCount,
+    state: CheckedStateLike,
+    delta: number,
+  ): void {
+    if (state === "checked" || state === "indeterminate") {
+      counts.checked += delta;
+    }
+    if (state === "unchecked" || state === "indeterminate") {
+      counts.unchecked += delta;
+    }
+  }
+
+  /**
+   * 增量更新核心：节点状态变化后沿祖先链向上传播
+   * 父节点状态仅依赖直接子节点，逐级更新父节点计数并重算状态，状态不变的祖先链提前终止
+   * @param {NodeId} id 状态发生变化的节点id
+   * @param {CheckedStateLike} oldState 变化前状态（"" 表示此前不存在）
+   * @param {CheckedStateLike} newState 变化后状态（"" 表示被删除）
+   */
+  private propagateCheckedState(
+    id: NodeId,
+    oldState: CheckedStateLike,
+    newState: CheckedStateLike,
+  ): void {
+    if (
+      oldState === newState ||
+      !this.flatNodesMap ||
+      !this.nodeCheckedStateMap ||
+      !this.childStateCountMap
+    ) {
+      return;
+    }
+
+    let curId = id;
+    let curOldState = oldState;
+    let curNewState = newState;
+
+    while (curId !== this.ROOT_PARENT_ID) {
+      const node = this.flatNodesMap.get(curId);
+      if (!node || node.isRoot) {
+        break;
+      }
+      const parent = this.flatNodesMap.get(node.pId);
+      if (!parent) {
+        break;
+      }
+
+      // 更新父节点计数：子节点状态 curOldState → curNewState
+      let counts = this.childStateCountMap.get(parent.id);
+      if (!counts) {
+        counts = { checked: 0, unchecked: 0 };
+        this.childStateCountMap.set(parent.id, counts);
+      }
+      this.adjustStateCount(counts, curOldState, -1);
+      this.adjustStateCount(counts, curNewState, 1);
+
+      // 重算父节点状态
+      const parentOldState =
+        this.nodeCheckedStateMap.get(parent.id) || "unchecked";
+      const parentNewState = this.resolveStateByCounts(parent, counts);
+      this.applyStateToNode(parent, parentNewState);
+
+      if (parentNewState === parentOldState) {
+        break;
+      }
+
+      curId = parent.id;
+      curOldState = parentOldState;
+      curNewState = parentNewState;
+    }
+  }
+
+  /**
+   * 单节点状态解析（增量路径：非 linkage 修改后调用）
+   * 叶子按 resolved 状态，非叶子按直接子节点计数（用户设置的 checked 会被子节点状态覆盖）
+   * @param {YTreeModel} node
+   */
+  private resolveNodeState(node: YTreeModel): YTreeCheckedState {
+    if ((node.childIds || []).length === 0) {
+      return this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
+    }
+    return this.resolveStateByCounts(
+      node,
+      this.childStateCountMap?.get(node.id),
+    );
+  }
+
+  /**
+   * 单节点增量更新（非 linkage 勾选）
+   * 重算节点最终状态、同步叶子统计并沿祖先链传播
+   * @param {YTreeModel} node 已由 applyNodeChecked 修改 checked 的节点
+   */
+  private applySingleNodeChecked(node: YTreeModel): void {
+    const oldState = this.getNodeCheckedState(node.id);
+    const newState = this.resolveNodeState(node);
+
+    // 始终写回最终状态（覆盖 applyNodeChecked 对非叶子节点的无效设置）
+    this.applyStateToNode(node, newState);
+
+    if (newState === oldState) {
+      return;
+    }
+
+    this.propagateCheckedState(node.id, oldState, newState);
+
+    // 叶子节点统计同步（叶子状态仅 checked/unchecked 两态）
+    if (this.isLeafNode(node)) {
+      this.treeLeafChecked += node.checked ? 1 : -1;
+      this.syncTreeCheckedStatus();
+    }
+  }
+
+  /**
+   * 子树局部重建（自底向上）+ 叶子统计同步 + 沿祖先链向上传播
+   * 用于联动勾选（linkage）与复制新子树（isNewSubtree=true）
+   * @param {NodeId} rootId 子树根节点id
+   * @param {boolean} isNewSubtree 是否为全新子树（新增叶子计入 treeLeafTotal）
+   */
+  private rebuildSubtreeCheckedStatus(
+    rootId: NodeId,
+    isNewSubtree: boolean = false,
+  ): void {
+    if (
+      !this.flatNodesMap ||
+      !this.nodeCheckedStateMap ||
+      !this.childStateCountMap
+    ) {
+      return;
+    }
+    const root = this.flatNodesMap.get(rootId);
+    if (!root) {
+      return;
+    }
+
+    const rootOldState = this.nodeCheckedStateMap.get(rootId) || "";
+
+    // 收集子树节点并按 level 分组（自底向上局部重建）
+    const subtreeIds = this.collectSubtreeNodeIds(rootId);
+    const levelIds = new Map<number, Array<NodeId>>();
+    let maxLevel = root.level;
+    for (let index = 0; index < subtreeIds.length; index++) {
+      const subNode = this.flatNodesMap.get(subtreeIds[index]);
+      if (!subNode) {
+        continue;
+      }
+      const ids = levelIds.get(subNode.level);
+      if (ids) {
+        ids.push(subNode.id);
+      } else {
+        levelIds.set(subNode.level, [subNode.id]);
+      }
+      if (subNode.level > maxLevel) {
+        maxLevel = subNode.level;
+      }
+    }
+
+    for (let level = maxLevel; level >= root.level; level--) {
+      const ids = levelIds.get(level);
+      if (!ids) {
+        continue;
+      }
+      for (let index = 0; index < ids.length; index++) {
+        const subNode = this.flatNodesMap.get(ids[index]);
+        if (!subNode) {
+          continue;
+        }
+
+        const counts = this.computeChildStateCount(subNode);
+        const isLeaf = counts.checked + counts.unchecked === 0;
+
+        if (isLeaf) {
+          const preChecked = isNewSubtree
+            ? false
+            : this.nodeCheckedStateMap.get(subNode.id) === "checked";
+          const state = this.getResolvedLeafChecked(subNode)
+            ? "checked"
+            : "unchecked";
+          this.applyStateToNode(subNode, state);
+          // 联动勾选：增量维护勾选叶子数（结构变更后由惰性重算兜底）
+          if (!isNewSubtree) {
+            this.treeLeafChecked +=
+              (subNode.checked ? 1 : 0) - (preChecked ? 1 : 0);
+          }
+        } else {
+          this.childStateCountMap.set(subNode.id, counts);
+          this.applyStateToNode(
+            subNode,
+            this.resolveStateByCounts(subNode, counts),
+          );
+        }
+      }
+    }
+    if (!isNewSubtree) {
+      this.syncTreeCheckedStatus();
+    }
+
+    // 子树根状态变化 → 沿祖先链向上传播
+    const rootNewState = this.nodeCheckedStateMap.get(rootId) || "unchecked";
+    this.propagateCheckedState(rootId, rootOldState, rootNewState);
+  }
+
+  /**
+   * 同步整树勾选汇总状态（基于叶子统计，O(1)）
+   */
+  private syncTreeCheckedStatus(): void {
+    this.TREE_CHECKED_STATUS =
+      this.treeLeafTotal > 0 && this.treeLeafTotal === this.treeLeafChecked;
+  }
+
+  /**
+   * 结构变更后的叶子汇总惰性重算（O(N)，仅 dirty 时执行一次）
+   */
+  private ensureLeafStats(): void {
+    if (!this.leafStatsDirty || !this.flatNodesMap) {
+      return;
+    }
+    this.leafStatsDirty = false;
+    let total = 0;
+    let checked = 0;
+    this.flatNodesMap.forEach((node) => {
+      if (this.isLeafNode(node)) {
+        total++;
+        if (this.getResolvedLeafChecked(node)) {
+          checked++;
+        }
+      }
+    });
+    this.treeLeafTotal = total;
+    this.treeLeafChecked = checked;
+    this.TREE_CHECKED_STATUS = total > 0 && total === checked;
+  }
+
+  /**
+   * 重建整树勾选状态（自底向上，O(N+E)，仅初始化/手动刷新时全量执行）
    * 1. 叶子节点根据nocheck/checked得到真实状态
    * 2. 非叶子节点根据直接子节点状态反算
    * 3. 同步整树汇总状态（根节点状态可O(1)读取）
+   * 4. 同步填充直接子节点状态计数（增量更新前置数据）
    */
   private rebuildCheckedStatus() {
     if (!this.flatNodesMap || !this.levelMap) {
@@ -1248,6 +1653,7 @@ export class YTreeService {
 
     const checkedIds = new Set<NodeId>();
     const nodeStateMap = new Map<NodeId, YTreeCheckedState>();
+    const childStateCountMap = new Map<NodeId, ChildStateCount>();
     let treeLeafTotal = 0;
     let treeLeafChecked = 0;
 
@@ -1265,10 +1671,10 @@ export class YTreeService {
         }
 
         const childIds = node.childIds || [];
-        let hasChecked = false;
-        let hasUnchecked = false;
         let childCount = 0;
+        const counts: ChildStateCount = { checked: 0, unchecked: 0 };
 
+        // 完整统计直接子节点状态计数（不短路，保证计数完整供增量更新使用）
         for (let childIndex = 0; childIndex < childIds.length; childIndex++) {
           const childId = childIds[childIndex];
           if (!this.flatNodesMap.has(childId)) {
@@ -1276,41 +1682,35 @@ export class YTreeService {
           }
           childCount++;
           const childState = nodeStateMap.get(childId) || "unchecked";
-          if (childState === "checked") {
-            hasChecked = true;
-          } else if (childState === "indeterminate") {
-            hasChecked = true;
-            hasUnchecked = true;
-          } else {
-            hasUnchecked = true;
+          if (childState === "checked" || childState === "indeterminate") {
+            counts.checked++;
           }
-          if (hasChecked && hasUnchecked) {
-            break;
+          if (childState === "unchecked" || childState === "indeterminate") {
+            counts.unchecked++;
           }
         }
 
+        // 非叶子节点缓存直接子节点状态计数（增量更新用）
+        if (childCount > 0) {
+          childStateCountMap.set(id, counts);
+        }
+
+        let state: YTreeCheckedState;
         if (childCount === 0) {
-          const checked = this.getResolvedLeafChecked(node);
-          node.checked = checked;
-          node.halfChecked = false;
-          nodeStateMap.set(id, checked ? "checked" : "unchecked");
+          state = this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
           treeLeafTotal++;
-          if (checked) {
+          if (state === "checked") {
             treeLeafChecked++;
           }
-        } else if (hasChecked && !hasUnchecked) {
-          node.checked = true;
-          node.halfChecked = false;
-          nodeStateMap.set(id, "checked");
-        } else if (!hasChecked && hasUnchecked) {
-          node.checked = false;
-          node.halfChecked = false;
-          nodeStateMap.set(id, "unchecked");
+        } else if (counts.unchecked === 0) {
+          state = "checked";
+        } else if (counts.checked === 0) {
+          state = "unchecked";
         } else {
-          node.checked = false;
-          node.halfChecked = true;
-          nodeStateMap.set(id, "indeterminate");
+          state = "indeterminate";
         }
+
+        this.applyStateToNode(node, state, nodeStateMap, false);
 
         if (node.checked) {
           checkedIds.add(id);
@@ -1320,10 +1720,12 @@ export class YTreeService {
 
     this.checkIds = checkedIds;
     this.nodeCheckedStateMap = nodeStateMap;
+    this.childStateCountMap = childStateCountMap;
     this.treeLeafTotal = treeLeafTotal;
     this.treeLeafChecked = treeLeafChecked;
     this.TREE_CHECKED_STATUS =
       treeLeafTotal > 0 && treeLeafTotal === treeLeafChecked;
+    this.leafStatsDirty = false;
   }
 
   /**
