@@ -61,6 +61,18 @@
   color: #1677ff;
 }
 
+/* 懒加载：子节点异步加载中（旋转 loading，替代展开箭头） */
+.y-tree-switcher-icon.is-ajaxing {
+  color: #1677ff;
+  animation: y-tree-ajaxing-spin 1s linear infinite;
+}
+
+@keyframes y-tree-ajaxing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .y-tree-checkbox {
   position: relative;
   display: inline-flex;

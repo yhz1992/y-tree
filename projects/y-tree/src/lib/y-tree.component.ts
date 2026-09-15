@@ -16,12 +16,18 @@ import type {
   NodeId,
   YTreeModel,
   YTreeAddEvent,
+  YTreeAsyncErrorEvent,
+  YTreeAsyncEvent,
+  YTreeAsyncFrom,
+  YTreeAsyncSuccessEvent,
   YTreeNodeEvent,
+  YTreeFlatNode,
   YTreeRemoveEvent,
   YTreeRenameEvent,
   YTreeDragEvent,
   YTreeDragMoveEvent,
   YTreeDropEvent,
+  YTreeNode,
 } from '../common/model';
 
 /**
@@ -78,6 +84,22 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * 拖拽生效最小移动距离（px）
    */
   @Input() minMoveSize: number = 5;
+  /**
+   * 懒加载模式：子节点在首次展开时通过 loadData 异步获取
+   */
+  @Input() lazy: boolean = false;
+  /**
+   * 异步加载子节点数据（lazy 开启时生效）
+   */
+  @Input() loadData?: (
+    node: YTreeModel
+  ) =>
+    | Promise<Array<YTreeNode | YTreeFlatNode>>
+    | Array<YTreeNode | YTreeFlatNode>;
+  /**
+   * 异步加载前置拦截，返回 false 取消本次加载
+   */
+  @Input() beforeAsync?: (payload: YTreeAsyncEvent) => boolean;
   /**
    * 拖拽开始前置拦截，返回 false 取消
    */
@@ -203,6 +225,14 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   @Output() add = new EventEmitter<any>();
   /**
+   * 异步加载成功事件（懒加载 P3）
+   */
+  @Output() asyncSuccess = new EventEmitter<any>();
+  /**
+   * 异步加载失败事件（懒加载 P3）
+   */
+  @Output() asyncError = new EventEmitter<any>();
+  /**
    * 自定义节点 DOM 模板（对标 zTree addDiyDom）
    */
   @ContentChild('nodeExtra', { static: false })
@@ -286,10 +316,48 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   private service: YTreeService | null = null;
 
+  /**
+   * 懒加载根节点异步：datasource 为空时异步加载到的根数据
+   */
+  private lazyRootData: Array<YTreeNode | YTreeFlatNode> | null = null;
+
+  /**
+   * 根节点异步是否已触发（避免重复请求）
+   */
+  private rootLoadStarted: boolean = false;
+
   constructor(private ref: ChangeDetectorRef) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     this.initService();
+    this.tryLoadLazyRoot();
+  }
+
+  /**
+   * 实际参与建树的数据源（根节点异步成功后用加载到的数据）
+   */
+  private get effectiveDatasource(): Array<any> {
+    if (this.datasource && this.datasource.length > 0) {
+      return this.datasource;
+    }
+    if (this.lazy && this.lazyRootData) {
+      return this.lazyRootData;
+    }
+    return this.datasource ?? [];
+  }
+
+  /**
+   * 根节点异步：lazy 开启且 datasource 为空时自动加载根数据（仅触发一次）
+   */
+  private tryLoadLazyRoot(): void {
+    if (!this.lazy || !this.loadData || this.rootLoadStarted) {
+      return;
+    }
+    if (this.datasource && this.datasource.length > 0) {
+      return;
+    }
+    this.rootLoadStarted = true;
+    void this.runLazyLoad(this.service!.createLazyRootNode(), 'api', true);
   }
 
   /**
@@ -308,7 +376,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   private initService(): void {
     this.service?.destroyed();
     this.service = new YTreeService(
-      this.datasource,
+      this.effectiveDatasource,
       this.toSetOrNull(this.checkedIds),
       this.toSetOrNull(this.selectedIds),
       this.toSetOrNull(this.nocheckIds),
@@ -446,11 +514,106 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     }
     // 最后一列：水平虚线连接竖线与节点内容（拐角）；叶子横线画满 indent（margin-right 6px 前）
     const startX = (L - 1) * 24 + 8;
-    const lineLen = node.childIds.length === 0 ? L * 24 + 16 - startX : 12;
+    const lineLen = this.hasChildren(node.id) ? 12 : L * 24 + 16 - startX;
     layers.push(
       `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) ${startX}px 14px / ${lineLen}px 1px no-repeat`
     );
     return layers.join(', ');
+  }
+
+  /**
+   * 节点是否具备子节点（懒加载「标记为父节点但尚未加载」也计入）
+   * 模板据此渲染展开箭头与缩进对齐
+   * @param id 节点id
+   */
+  protected hasChildren(id: NodeId): boolean {
+    return this.service?.hasChildren(id) ?? false;
+  }
+
+  // ------------------------------------------------------------------
+  // 懒加载（P3）
+  // ------------------------------------------------------------------
+
+  /**
+   * 执行一次异步加载
+   * @param node 目标节点
+   * @param from 触发来源
+   * @param isRoot 是否为根节点异步（加载结果写入根数据集）
+   * @param event 原始鼠标事件（用于 expandChange 回调）
+   * @returns 是否加载成功
+   */
+  private async runLazyLoad(
+    node: YTreeModel,
+    from: YTreeAsyncFrom,
+    isRoot: boolean = false,
+    event?: MouseEvent
+  ): Promise<boolean> {
+    if (!this.service || !this.loadData) {
+      return false;
+    }
+
+    const payload: YTreeAsyncEvent = {
+      id: node.id,
+      name: node.name,
+      from,
+      node,
+    };
+
+    // beforeAsync 前置拦截
+    if (this.beforeAsync && this.beforeAsync(payload) === false) {
+      return false;
+    }
+
+    // 根节点异步时无实体节点，不需要 loading 标记
+    if (!isRoot) {
+      this.service.setNodeLoading(node.id, true);
+      this.ref.markForCheck();
+    }
+
+    try {
+      const result = await this.loadData(node);
+      const children = Array.isArray(result) ? result : [];
+      if (isRoot) {
+        this.lazyRootData = children;
+        // 用加载到的根数据重建服务
+        this.initService();
+      } else {
+        this.service.setNodeChildren(node.id, children);
+        this.service.setNodeLoading(node.id, false);
+        // 加载成功后才真正展开
+        this.expandedIds.add(node.id);
+        this.rebuildVisibleNodes();
+        this.expandChange.emit({
+          event: event ?? null,
+          id: node.id,
+          expand: true,
+        });
+      }
+      this.ref.markForCheck();
+      this.asyncSuccess.emit({ ...payload, children });
+      return true;
+    } catch (error) {
+      if (!isRoot) {
+        this.service.setNodeLoading(node.id, false);
+      }
+      this.ref.markForCheck();
+      this.asyncError.emit({ ...payload, error });
+      return false;
+    }
+  }
+
+  /**
+   * 重新异步加载指定节点的子节点（懒加载模式）
+   * @param id 节点id
+   * @returns 是否加载成功
+   */
+  public reAsyncChildNodes(id: NodeId): Promise<boolean> {
+    const node = this.service?.getNodeById(id);
+    if (!node || !this.loadData) {
+      return Promise.resolve(false);
+    }
+    // 重新拉取并整体替换该节点的子树
+    return this.runLazyLoad(node, 'api');
   }
 
   /**
@@ -497,6 +660,16 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   protected onExpandChange(event: MouseEvent, id: NodeId) {
     event.stopPropagation();
     const next = !this.expandedIds.has(id);
+
+    // 懒加载：首次展开且子节点尚未加载 → 触发异步加载，成功后由 runLazyLoad 展开
+    if (next && this.lazy && this.loadData && this.service?.isLazyParent(id)) {
+      const node = this.service.getNodeById(id);
+      if (node && !node.isAjaxing) {
+        void this.runLazyLoad(node, 'user', false, event);
+      }
+      return;
+    }
+
     if (next) {
       this.expandedIds.add(id);
     } else {
@@ -577,7 +750,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     this.draggingId = id;
     this.ref.markForCheck();
     // 拖拽时收起非叶子节点（延迟到拖拽会话建立后执行）
-    if (node.childIds.length > 0 && this.expandedIds.has(id)) {
+    if (this.hasChildren(id) && this.expandedIds.has(id)) {
       const collapseId = id;
       window.setTimeout(() => {
         if (this.expandedIds.has(collapseId)) {
@@ -630,7 +803,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = copyMode ? 'copy' : 'move';
     }
-    const position = this.calcDropPosition(event, node.childIds.length > 0);
+    const position = this.calcDropPosition(event, this.hasChildren(id));
     this.dropTarget = { id, position };
     this.ref.markForCheck();
     this.dragMove.emit({

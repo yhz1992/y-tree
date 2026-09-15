@@ -47,22 +47,26 @@
     >
       <span
         class="y-tree-indent"
-        [class.y-tree-indent-leaf]="item.node.childIds.length === 0"
+        [class.y-tree-indent-leaf]="!hasChildren(item.id)"
         [style.width.px]="
-          item.node.level * 24 + (item.node.childIds.length === 0 ? 16 : 0)
+          item.node.level * 24 + (!hasChildren(item.id) ? 16 : 0)
         "
         [style.background]="indentBg(item.node)"
       ></span>
       <span
         class="y-tree-switcher"
-        *ngIf="item.node.childIds.length > 0"
+        *ngIf="hasChildren(item.id)"
         [ngClass]="{ 'has-children': true, 'is-expanded': isExpanded(item.id) }"
         (click)="onExpandChange($event, item.id)"
       >
         <i
           class="fa-solid y-tree-switcher-icon"
           [ngClass]="
-            isExpanded(item.id) ? 'fa-chevron-down' : 'fa-chevron-right'
+            item.node.isAjaxing
+              ? 'fa-spinner is-ajaxing'
+              : isExpanded(item.id)
+              ? 'fa-chevron-down'
+              : 'fa-chevron-right'
           "
         ></i>
       </span>

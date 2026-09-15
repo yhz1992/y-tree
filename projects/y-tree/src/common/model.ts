@@ -93,6 +93,11 @@ export interface YTreeModel extends YTreeFlatNode {
    * @type {boolean}
    */
   halfChecked?: boolean;
+  /**
+   * 子节点是否正在异步加载中（懒加载模式下渲染 loading 图标）
+   * @type {boolean}
+   */
+  isAjaxing?: boolean;
 }
 
 /**
@@ -144,6 +149,11 @@ interface YTreeBaseNode {
    * @type {boolean}
    */
   hide?: boolean;
+  /**
+   * 懒加载模式：标记该节点为父节点（子节点尚未加载，展开时触发 loadData）
+   * @type {boolean}
+   */
+  isParent?: boolean;
   [key: string]: any;
 }
 
@@ -269,3 +279,58 @@ export interface DataSource<M extends Array<YTreeNode | YTreeFlatNode>> {
    */
   disConnect: () => void;
 }
+
+/**
+ * 异步加载触发来源：
+ * user=用户展开节点触发；api=程序化调用 reAsyncChildNodes
+ */
+export type YTreeAsyncFrom = "user" | "api";
+
+/**
+ * 异步加载事件基类（懒加载 P3）
+ */
+export interface YTreeAsyncEvent {
+  /**
+   * 触发加载的节点id（根节点异步时为其虚拟根 id）
+   * @type {string | number}
+   */
+  id: string | number;
+  /**
+   * 节点名称
+   * @type {string}
+   */
+  name: string;
+  /**
+   * 触发来源
+   * @type {YTreeAsyncFrom}
+   */
+  from: YTreeAsyncFrom;
+  /**
+   * 节点内部模型（根节点异步时为虚拟根模型）
+   * @type {YTreeModel}
+   */
+  node: YTreeModel;
+}
+
+/**
+ * 异步加载成功事件
+ * @extends {YTreeAsyncEvent}
+ */
+export interface YTreeAsyncSuccessEvent extends YTreeAsyncEvent {
+  /**
+   * 本次加载得到的子节点数据
+   */
+  children: Array<YTreeNode | YTreeFlatNode>;
+}
+
+/**
+ * 异步加载失败事件
+ * @extends {YTreeAsyncEvent}
+ */
+export interface YTreeAsyncErrorEvent extends YTreeAsyncEvent {
+  /**
+   * 加载失败的错误对象
+   */
+  error: any;
+}
+

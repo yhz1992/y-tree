@@ -8,6 +8,12 @@ import type {
 } from "./model";
 
 /**
+ * 懒加载「根节点异步」时使用的虚拟根节点 id
+ * datasource 为空且开启 lazy 时，loadData 会收到以该 id 构造的虚拟根节点
+ */
+export const Y_TREE_ROOT_ID = "__yt_root__";
+
+/**
  * 节点直接子节点的状态计数（增量更新用）
  * checked = 子节点中状态为 checked/indeterminate 的数量
  * unchecked = 子节点中状态为 unchecked/indeterminate 的数量
@@ -633,7 +639,9 @@ export class YTreeService {
     this.refreshSiblingMeta(childIds, parent.id);
 
     // 新节点状态（叶子，nocheck 视为勾选）
-    const newState = this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
+    const newState = this.getResolvedLeafChecked(node)
+      ? "checked"
+      : "unchecked";
     this.applyStateToNode(node, newState);
 
     // 结构变更：叶子汇总标记失效（读取时惰性重算）
@@ -652,6 +660,165 @@ export class YTreeService {
   private generateNodeId(): NodeId {
     this.nodeIdCounter += 1;
     return `__yt_new_${Date.now()}_${this.nodeIdCounter}`;
+  }
+
+  // ------------------------------------------------------------------
+  // 懒加载（P3）
+  // ------------------------------------------------------------------
+
+  /**
+   * 构造懒加载「虚拟根节点」（datasource 为空、需异步加载根节点时传给 loadData）
+   * @returns {YTreeModel}
+   */
+  public createLazyRootNode(): YTreeModel {
+    const id = Y_TREE_ROOT_ID;
+    return {
+      id,
+      name: "root",
+      pId: this.ROOT_PARENT_ID,
+      level: 0,
+      index: 0,
+      isRoot: true,
+      isFirst: true,
+      isLast: true,
+      preId: this.ROOT_PARENT_ID,
+      nextId: this.ROOT_PARENT_ID,
+      childIds: [],
+      checked: false,
+      selected: false,
+      nocheck: false,
+      disabled: false,
+      hide: false,
+      expanded: false,
+      halfChecked: false,
+      isParent: true,
+    };
+  }
+
+  /**
+   * 节点是否具备子节点（含懒加载模式下「标记为父节点但子节点尚未加载」的情况）
+   * 组件据此决定是否渲染展开箭头
+   * @param {NodeId} id 节点id
+   * @returns {boolean}
+   */
+  public hasChildren(id: NodeId): boolean {
+    const node = this.flatNodesMap?.get(id);
+    if (!node) {
+      return false;
+    }
+    return node.childIds.length > 0 || !!node.isParent;
+  }
+
+  /**
+   * 是否为「待异步加载」的父节点（标记 isParent 且子节点尚未加载）
+   * @param {NodeId} id 节点id
+   * @returns {boolean}
+   */
+  public isLazyParent(id: NodeId): boolean {
+    const node = this.flatNodesMap?.get(id);
+    if (!node) {
+      return false;
+    }
+    return !!node.isParent && node.childIds.length === 0;
+  }
+
+  /**
+   * 标记节点异步加载状态（渲染 loading 图标用）
+   * @param {NodeId} id 节点id
+   * @param {boolean} loading 是否加载中
+   * @returns {boolean} 节点是否存在
+   */
+  public setNodeLoading(id: NodeId, loading: boolean): boolean {
+    const node = this.flatNodesMap?.get(id);
+    if (!node) {
+      return false;
+    }
+    node.isAjaxing = loading;
+    return true;
+  }
+
+  /**
+   * 写入异步加载得到的子节点（懒加载核心）
+   * 复用 addNode 的增量勾选传播，天然支持嵌套数据（children 递归展开）
+   * @param {NodeId} parentId 父节点id
+   * @param {Array<YTreeNode | YTreeFlatNode>} children 子节点数据
+   * @param {boolean} append 是否追加；默认 false 表示替换已有子节点
+   * @returns {Array<NodeId>} 本次新增的子节点id集合
+   */
+  public setNodeChildren(
+    parentId: NodeId,
+    children: Array<YTreeNode | YTreeFlatNode>,
+    append: boolean = false,
+  ): Array<NodeId> {
+    if (!this.flatNodesMap || !this.levelMap) {
+      return [];
+    }
+    const parent = this.flatNodesMap.get(parentId);
+    if (!parent) {
+      return [];
+    }
+
+    // 非追加模式：先摘除已有子树（含其勾选状态传播）
+    if (!append) {
+      const existed = [...parent.childIds];
+      for (const cid of existed) {
+        this.removeNode(cid);
+      }
+    }
+
+    const added: Array<NodeId> = [];
+    const list = Array.isArray(children) ? children : [];
+
+    const insertOne = (pId: NodeId, item: YTreeNode | YTreeFlatNode): void => {
+      const raw = item as Record<string, any>;
+      const id = this.addNode(pId, raw as Partial<YTreeNode>, -1);
+      if (id === null) {
+        return;
+      }
+      added.push(id);
+      const nested = raw["children"];
+      if (Array.isArray(nested) && nested.length > 0) {
+        for (const child of nested) {
+          insertOne(id, child as YTreeNode);
+        }
+      }
+    };
+
+    for (const item of list) {
+      if (item) {
+        insertOne(parentId, item);
+      }
+    }
+
+    // 加载完成后按实际子节点情况决定是否仍显示展开箭头：
+    // 有子节点 → 普通父节点；无子节点 → 视为叶子，避免出现「点了没反应」的空箭头
+    parent.isParent = parent.childIds.length > 0;
+    this.normalizeLazyFlags(added, parentId);
+
+    return added;
+  }
+
+  /**
+   * 归一化本次加载节点的 isParent 标记：
+   * 已有子节点 → 必为父节点；无子节点且未显式标记 → 叶子
+   * @param {Array<NodeId>} ids 本次新增节点id集合
+   * @param {NodeId} parentId 其父节点id（父节点由 setNodeChildren 单独处理）
+   */
+  private normalizeLazyFlags(ids: Array<NodeId>, parentId: NodeId): void {
+    for (const id of ids) {
+      if (id === parentId) {
+        continue;
+      }
+      const node = this.flatNodesMap?.get(id);
+      if (!node) {
+        continue;
+      }
+      if (node.childIds.length > 0) {
+        node.isParent = true;
+      } else if (node.isParent === undefined) {
+        node.isParent = false;
+      }
+    }
   }
 
   /**

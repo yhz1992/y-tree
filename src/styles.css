@@ -2,23 +2,283 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  background: #f5f5f5;
+  background: #f5f6f8;
+  color: #1f2329;
 }
 
-.app {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 32px 16px;
+/* ---------- 整体布局：左侧菜单 + 右侧内容 ---------- */
+.demo-layout {
+  display: flex;
+  align-items: flex-start;
 }
 
-.app h1 {
-  font-size: 20px;
-  margin-bottom: 16px;
-}
-
-.app-card {
+.demo-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 220px;
+  height: 100vh;
+  overflow-y: auto;
   background: #fff;
-  border: 1px solid #eee;
+  border-right: 1px solid #eaecef;
+  padding: 20px 0 40px;
+  box-sizing: border-box;
+}
+
+.demo-sidebar-title {
+  font-size: 18px;
+  font-weight: 600;
+  padding: 0 20px 16px;
+  letter-spacing: 0.5px;
+}
+
+.demo-sidebar-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8a919f;
+  margin-left: 6px;
+}
+
+.demo-sidebar-group {
+  margin-bottom: 6px;
+}
+
+.demo-sidebar-group-title {
+  font-size: 12px;
+  color: #8a919f;
+  padding: 10px 20px 4px;
+  letter-spacing: 0.4px;
+}
+
+.demo-sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.demo-sidebar-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: #4e5969;
+  padding: 7px 20px;
+  cursor: pointer;
+  border-right: 2px solid transparent;
+  font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+}
+
+.demo-sidebar-link:hover {
+  color: #1677ff;
+  background: #f7f9fc;
+}
+
+.demo-sidebar-link.is-active {
+  color: #1677ff;
+  background: #f0f6ff;
+  border-right-color: #1677ff;
+  font-weight: 500;
+}
+
+.demo-main {
+  margin-left: 220px;
+  flex: 1;
+  min-width: 0;
+  padding: 28px 40px 80px;
+  max-width: 920px;
+  box-sizing: border-box;
+}
+
+.demo-header h1 {
+  font-size: 24px;
+  margin: 0 0 6px;
+}
+
+.demo-header p {
+  font-size: 13px;
+  color: #8a919f;
+  margin: 0 0 24px;
+  line-height: 1.7;
+}
+
+/* ---------- 功能点卡片 ---------- */
+.demo-card {
+  background: #fff;
   border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  scroll-margin-top: 24px;
+}
+
+.demo-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.demo-card-desc {
+  font-size: 13px;
+  color: #8a919f;
+  margin: 0 0 14px;
+  line-height: 1.7;
+}
+
+.demo-card-body {
+  border: 1px solid #eaecef;
+  border-radius: 6px;
   padding: 16px;
+}
+
+.demo-card-code-bar {
+  margin-top: 10px;
+}
+
+.demo-card-code-btn {
+  border: none;
+  background: none;
+  color: #1677ff;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.demo-card-code-caret {
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 10px;
+}
+
+.demo-card-code-caret.is-open {
+  transform: rotate(90deg);
+}
+
+.demo-card-code {
+  margin: 6px 0 0;
+  background: #f7f8fa;
+  border-radius: 6px;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-x: auto;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  color: #334155;
+}
+
+/* ---------- demo 内的通用元素 ---------- */
+.demo-tip {
+  font-size: 12px;
+  color: #8a919f;
+  margin: 10px 0 0;
+  line-height: 1.6;
+}
+
+.demo-log {
+  font-size: 11px;
+  background: #f7f8fa;
+  padding: 8px 10px;
+  margin: 10px 0 0;
+  max-height: 84px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border-radius: 4px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  color: #4e5969;
+}
+
+.demo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.demo-toolbar button,
+.demo-actions button {
+  font-size: 12px;
+  padding: 5px 12px;
+  border: 1px solid #d9dde3;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  color: #4e5969;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.demo-toolbar button:hover,
+.demo-actions button:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.demo-input {
+  font-size: 12px;
+  padding: 5px 10px;
+  border: 1px solid #d9dde3;
+  border-radius: 4px;
+  font-family: inherit;
+  color: #4e5969;
+  outline: none;
+  min-width: 200px;
+}
+
+.demo-input:focus {
+  border-color: #1677ff;
+}
+
+.demo-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #4e5969;
+  cursor: pointer;
+  user-select: none;
+}
+
+.demo-node-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 17px;
+  color: #1677ff;
+  background: #f0f6ff;
+  border-radius: 3px;
+}
+
+.demo-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.demo-col {
+  flex: 1;
+  min-width: 180px;
+}
+
+.demo-col-label {
+  font-size: 12px;
+  color: #8a919f;
+  margin-bottom: 6px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (max-width: 900px) {
+  .demo-sidebar {
+    display: none;
+  }
+  .demo-main {
+    margin-left: 0;
+    padding: 20px 16px 60px;
+  }
 }
