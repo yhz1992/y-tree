@@ -57,6 +57,7 @@
         class="y-tree-switcher"
         *ngIf="hasChildren(item.id)"
         [ngClass]="{ 'has-children': true, 'is-expanded': isExpanded(item.id) }"
+        [style.background]="switcherBg(item.node)"
         (click)="onExpandChange($event, item.id)"
       >
         <i

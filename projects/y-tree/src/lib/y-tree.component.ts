@@ -472,49 +472,119 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   }
 
   /**
+   * 生成折叠切换器（Switcher）引导线背景
+   * 根节点与一级子节点在展开或多节点时产生垂直连接线
+   * @param node 节点信息
+   */
+  protected switcherBg(node: YTreeModel): string {
+    if (!this.showLine) {
+      return 'none';
+    }
+    const isExpanded = this.isExpanded(node.id);
+    const isRoot = node.level === 0;
+    const hasTopLine = isRoot && !node.isFirst;
+    const hasBottomLine = isRoot ? !node.isLast || isExpanded : isExpanded;
+
+    if (!hasTopLine && !hasBottomLine) {
+      return 'none';
+    }
+
+    const color = '#c0c4cc';
+    const layers: Array<string> = [];
+    if (hasTopLine && hasBottomLine) {
+      layers.push(
+        `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 100% no-repeat`
+      );
+    } else if (hasTopLine) {
+      layers.push(
+        `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 14px no-repeat`
+      );
+    } else if (hasBottomLine) {
+      layers.push(
+        `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 14px / 1px 14px no-repeat`
+      );
+    }
+    return layers.join(', ');
+  }
+
+  /**
    * 生成节点引导线背景（竖虚线 + 水平虚线），antd/Element 拐角风格
-   * 缩进 24px/列；竖线位于列内偏右（antd inset-inline-end: switcherSize/2 → x = i*24 + 13）
-   * 横线从父列竖线连接到内容边界（长 11px）；虚线 3px/3px 统一
-   * 列 i 竖线：非最后列 → 该级祖先非最后子时贯穿，否则不画；最后一列 → 最后子画半截（└），否则贯穿
-   * 每行独立绘制，兼容虚拟滚动
    * @param node 节点信息
    */
   protected indentBg(node: YTreeModel): string {
-    if (!this.showLine || node.level <= 0) {
+    if (!this.showLine) {
       return 'none';
     }
     const color = '#c0c4cc';
-    const layers: Array<string> = [];
-    // 收集祖先链：chain = [本节点(L), 父(L-1), ..., level1 祖先]
-    const chain: Array<YTreeModel> = [];
-    let cur: YTreeModel | null = node;
-    while (cur && cur.level > 0) {
-      chain.push(cur);
-      cur = this.service?.getNodeById(cur.pId) ?? null;
-    }
-    const L = node.level;
-    for (let i = 0; i < L; i++) {
-      const ancestor = chain[L - 1 - i];
-      if (!ancestor) {
-        continue;
+    const level = node.level;
+    const isLeaf = !this.hasChildren(node.id);
+
+    // 一级节点（根节点）
+    if (level === 0) {
+      if (!isLeaf) {
+        return 'none';
       }
+      const hasTopLine = !node.isFirst;
+      const hasBottomLine = !node.isLast;
+      const hasHorizLine = !node.isFirst || !node.isLast;
+      if (!hasTopLine && !hasBottomLine && !hasHorizLine) {
+        return 'none';
+      }
+      const layers: Array<string> = [];
+      if (hasTopLine && hasBottomLine) {
+        layers.push(
+          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 100% no-repeat`
+        );
+      } else if (hasTopLine) {
+        layers.push(
+          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 14px no-repeat`
+        );
+      } else if (hasBottomLine) {
+        layers.push(
+          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 14px / 1px 14px no-repeat`
+        );
+      }
+      if (hasHorizLine) {
+        layers.push(
+          `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) 8px 14px / 8px 1px no-repeat`
+        );
+      }
+      return layers.join(', ');
+    }
+
+    // 二级及更深层级节点（level > 0）
+    const ancestors: Array<YTreeModel> = [];
+    let cur: YTreeModel | null = node;
+    while (cur) {
+      ancestors.unshift(cur);
+      const pId: string | number = cur.pId;
+      cur =
+        pId === undefined || pId === null || pId === ''
+          ? null
+          : this.service?.getNodeById(pId) ?? null;
+    }
+    const layers: Array<string> = [];
+    for (let i = 0; i < level; i++) {
       const x = i * 24 + 8;
-      const isCornerCol = i === L - 1;
+      const isCornerCol = i === level - 1;
       if (isCornerCol) {
-        // 本节点自己的列：最后子 → 半截（到横线）；否则贯穿
-        const height = ancestor.isLast ? '14px' : '100%';
+        const continuesDown =
+          !node.isLast || (level === 1 && ancestors[0] && !ancestors[0].isLast);
+        const height = continuesDown ? '100%' : '14px';
         layers.push(
           `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px ${height} no-repeat`
         );
-      } else if (!ancestor.isLast) {
-        layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`
-        );
+      } else {
+        const ancestor = ancestors[i];
+        if (ancestor && !ancestor.isLast) {
+          layers.push(
+            `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`
+          );
+        }
       }
     }
-    // 最后一列：水平虚线连接竖线与节点内容（拐角）；叶子横线画满 indent（margin-right 6px 前）
-    const startX = (L - 1) * 24 + 8;
-    const lineLen = this.hasChildren(node.id) ? 12 : L * 24 + 16 - startX;
+    const startX = (level - 1) * 24 + 8;
+    const lineLen = isLeaf ? level * 24 + 16 - startX : 12;
     layers.push(
       `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) ${startX}px 14px / ${lineLen}px 1px no-repeat`
     );

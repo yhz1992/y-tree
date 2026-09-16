@@ -39,14 +39,17 @@
 }
 
 .y-tree-switcher {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 18px;
-  height: 18px;
+  height: 28px;
   margin-right: 4px;
   color: rgba(0, 0, 0, 0.45);
   transition: color 0.2s;
+  box-sizing: border-box;
+  flex: none;
 }
 
 .y-tree-switcher.has-children {
@@ -54,7 +57,16 @@
 }
 
 .y-tree-switcher-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
   font-size: 12px;
+  background: #fff;
+  border-radius: 2px;
 }
 
 .y-tree-switcher.has-children:hover .y-tree-switcher-icon {
