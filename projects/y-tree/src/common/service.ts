@@ -2,9 +2,12 @@ import type {
   NodeId,
   YTreeCheckedState,
   YTreeCheckedSummary,
+  YTreeChkboxType,
+  YTreeChkStyle,
   YTreeFlatNode,
   YTreeModel,
   YTreeNode,
+  YTreeRadioType,
 } from "./model";
 
 /**
@@ -163,6 +166,26 @@ export class YTreeService {
   private TREE_CHECKED_STATUS: boolean = false;
 
   /**
+   * 勾选控件样式（checkbox / radio）
+   */
+  private chkStyle: YTreeChkStyle = "checkbox";
+
+  /**
+   * radio 互斥范围（all = 整树；level = 同级兄弟）
+   */
+  private radioType: YTreeRadioType = "all";
+
+  /**
+   * 父子联动方向（Y=勾选时，N=取消勾选时；p=祖先，s=子孙）
+   */
+  private chkboxType: { Y: string; N: string } = { Y: "ps", N: "ps" };
+
+  /**
+   * 最近一次 init 时的勾选快照（getChangeCheckedNodes 对比用）
+   */
+  private lastCheckedSnapshot: Set<NodeId> | null = null;
+
+  /**
    * 初始化数据，ps：二次初始化构建数据模型，内部数据计算状态将被重置
    * @param { Array<YTreeNode | YTreeFlatNode> } nodes 外部数据源
    * @returns {void} -
@@ -191,7 +214,27 @@ export class YTreeService {
     }
 
     this.rebuildCheckedStatus();
+    this.captureCheckedSnapshot();
     nodes = null;
+  }
+
+  /**
+   * 配置勾选模式（组件在 props 变化时调用）
+   * @param {YTreeChkStyle} chkStyle 勾选控件样式
+   * @param {YTreeRadioType} radioType radio 互斥范围
+   * @param {YTreeChkboxType | null} chkboxType 父子联动方向，null 表示默认双向 { Y: "ps", N: "ps" }
+   */
+  public configureCheckMode(
+    chkStyle: YTreeChkStyle = "checkbox",
+    radioType: YTreeRadioType = "all",
+    chkboxType: YTreeChkboxType | null = null,
+  ): void {
+    this.chkStyle = chkStyle === "radio" ? "radio" : "checkbox";
+    this.radioType = radioType === "level" ? "level" : "all";
+    this.chkboxType = {
+      Y: typeof chkboxType?.Y === "string" ? chkboxType.Y : "ps",
+      N: typeof chkboxType?.N === "string" ? chkboxType.N : "ps",
+    };
   }
 
   /**
@@ -222,6 +265,81 @@ export class YTreeService {
     linkage: boolean = true,
   ): boolean {
     return this.setCheckedStatus(id, checked, true, linkage);
+  }
+
+  /**
+   * 程序化勾选（对标 zTree checkNode，走 API 通道，可改 disabled 节点）
+   * @param {NodeId} id 节点id
+   * @param {boolean} checked 目标勾选状态
+   * @param {boolean} linkage 是否按 chkboxType 联动，默认 true
+   */
+  public checkNode(
+    id: NodeId,
+    checked: boolean,
+    linkage: boolean = true,
+  ): boolean {
+    return this.setCheckedByApi(id, checked, linkage);
+  }
+
+  /**
+   * 全选 / 全不选（对标 zTree checkAllNodes）
+   * radio 模式下全选无意义，仅全不选生效
+   * nocheck / checkboxDisabled 节点跳过；disabled 节点按 API 通道可改
+   * @param {boolean} checked true=全选，false=全不选
+   * @returns {boolean} 是否发生实际变更
+   */
+  public checkAllNodes(checked: boolean = true): boolean {
+    if (!this.flatNodesMap) {
+      return false;
+    }
+    if (this.chkStyle === "radio" && checked) {
+      return false;
+    }
+
+    let changed = false;
+    this.flatNodesMap.forEach((node) => {
+      if (!this.canUpdateChecked(node, true)) {
+        return;
+      }
+      if (this.applyNodeChecked(node, checked)) {
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      this.rebuildCheckedStatus();
+    }
+    return changed;
+  }
+
+  /**
+   * 全不选（对标 zTree cancelSelectedNode 的勾选版 cancelAllNodes）
+   */
+  public cancelAllNodes(): boolean {
+    return this.checkAllNodes(false);
+  }
+
+  /**
+   * 相对 init 时快照，勾选状态发生变化的节点（对标 zTree getChangeCheckedNodes）
+   * 不含 nocheck 节点
+   */
+  public getChangeCheckedNodes(): Array<YTreeModel> {
+    const list: Array<YTreeModel> = [];
+    if (!this.flatNodesMap) {
+      return list;
+    }
+    const snapshot = this.lastCheckedSnapshot ?? new Set<NodeId>();
+    this.flatNodesMap.forEach((node, id) => {
+      if (node.nocheck) {
+        return;
+      }
+      const was = snapshot.has(id);
+      const now = !!node.checked;
+      if (was !== now) {
+        list.push(node);
+      }
+    });
+    return list;
   }
 
   /**
@@ -841,6 +959,7 @@ export class YTreeService {
     this.treeLeafTotal = 0;
     this.treeLeafChecked = 0;
     this.TREE_CHECKED_STATUS = false;
+    this.lastCheckedSnapshot = null;
   }
 
   /**
@@ -1180,7 +1299,7 @@ export class YTreeService {
    * @param {NodeId} id 节点id
    * @param {boolean} checked 目标勾选状态
    * @param {boolean} fromApi 是否来自外部api
-   * @param {boolean} linkage 是否联动子节点
+   * @param {boolean} linkage 是否按 chkboxType 联动
    */
   private setCheckedStatus(
     id: NodeId,
@@ -1198,17 +1317,20 @@ export class YTreeService {
       return false;
     }
 
+    // radio 模式：勾选时先清互斥范围内的其它节点
+    if (this.chkStyle === "radio" && checked) {
+      this.clearRadioGroup(id, fromApi);
+    }
+
+    // radio 互斥已保证整树/同级只有一个勾选，再向下联动会破坏互斥，故 radio 不联动子孙
+    const affectChildren =
+      linkage &&
+      this.chkStyle !== "radio" &&
+      this.shouldAffectChildren(checked);
+    const affectParent = linkage && this.shouldAffectParent(checked);
+
     let changed = false;
-    if (!linkage) {
-      if (!this.canUpdateChecked(targetNode, fromApi)) {
-        return false;
-      }
-      changed = this.applyNodeChecked(targetNode, checked);
-      if (changed) {
-        // 单节点增量更新：重算该节点最终状态（叶子按 resolved，非叶子按子节点计数）并沿祖先链传播
-        this.applySingleNodeChecked(targetNode);
-      }
-    } else {
+    if (affectChildren) {
       const subtreeIds = this.collectSubtreeNodeIds(id);
       const len = subtreeIds.length;
 
@@ -1224,12 +1346,108 @@ export class YTreeService {
       }
 
       if (changed) {
-        // 子树局部重建（自底向上）+ 叶子统计同步 + 沿祖先链向上传播
-        this.rebuildSubtreeCheckedStatus(id);
+        // 子树局部重建（自底向上）+ 叶子统计同步；按 chkboxType 决定是否沿祖先链传播
+        this.rebuildSubtreeCheckedStatus(id, false, affectParent);
+      }
+    } else {
+      if (!this.canUpdateChecked(targetNode, fromApi)) {
+        return false;
+      }
+      changed = this.applyNodeChecked(targetNode, checked);
+      if (changed) {
+        // linkage=false（checkStrictly）：沿用旧语义——非叶子按子节点重算，并向上传播
+        // linkage=true 但不联动子孙（radio / chkboxType 不含 s）：保留用户设置的 checked
+        if (
+          linkage &&
+          !affectChildren &&
+          (targetNode.childIds || []).length > 0
+        ) {
+          const oldState = this.getNodeCheckedState(targetNode.id);
+          const newState: YTreeCheckedState = checked
+            ? "checked"
+            : "unchecked";
+          this.applyStateToNode(targetNode, newState);
+          if (affectParent && oldState !== newState) {
+            this.propagateCheckedState(targetNode.id, oldState, newState);
+          }
+        } else {
+          this.applySingleNodeChecked(
+            targetNode,
+            linkage ? affectParent : true,
+          );
+        }
       }
     }
 
     return changed;
+  }
+
+  /**
+   * 当前操作是否影响子孙（chkboxType 的 s）
+   */
+  private shouldAffectChildren(checked: boolean): boolean {
+    const dir = checked ? this.chkboxType.Y : this.chkboxType.N;
+    return dir.indexOf("s") >= 0;
+  }
+
+  /**
+   * 当前操作是否影响祖先（chkboxType 的 p）
+   */
+  private shouldAffectParent(checked: boolean): boolean {
+    const dir = checked ? this.chkboxType.Y : this.chkboxType.N;
+    return dir.indexOf("p") >= 0;
+  }
+
+  /**
+   * radio 互斥：清掉范围内其它已勾选节点
+   * all = 整树；level = 同级兄弟
+   */
+  private clearRadioGroup(keepId: NodeId, fromApi: boolean): void {
+    const keep = this.flatNodesMap?.get(keepId);
+    if (!keep) {
+      return;
+    }
+
+    const ids: Array<NodeId> = [];
+    if (this.radioType === "level") {
+      const siblings = this.getSiblingList(keep);
+      if (siblings) {
+        for (let i = 0; i < siblings.length; i++) {
+          ids.push(siblings[i]);
+        }
+      }
+    } else if (this.flatNodesMap) {
+      this.flatNodesMap.forEach((_node, id) => {
+        ids.push(id);
+      });
+    }
+
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      if (id === keepId) {
+        continue;
+      }
+      const node = this.flatNodesMap?.get(id);
+      if (!node || !this.canUpdateChecked(node, fromApi)) {
+        continue;
+      }
+      if (this.applyNodeChecked(node, false)) {
+        this.applySingleNodeChecked(node);
+      }
+    }
+  }
+
+  /**
+   * 记录当前勾选快照（init 后调用，供 getChangeCheckedNodes 对比）
+   */
+  private captureCheckedSnapshot(): void {
+    const snapshot = new Set<NodeId>();
+    this.flatNodesMap?.forEach((node, id) => {
+      if (!node.nocheck && node.checked) {
+        snapshot.add(id);
+      }
+    });
+    this.lastCheckedSnapshot = snapshot;
   }
 
   /**
@@ -1663,10 +1881,14 @@ export class YTreeService {
 
   /**
    * 单节点增量更新（非 linkage 勾选）
-   * 重算节点最终状态、同步叶子统计并沿祖先链传播
+   * 重算节点最终状态、同步叶子统计；按需沿祖先链传播
    * @param {YTreeModel} node 已由 applyNodeChecked 修改 checked 的节点
+   * @param {boolean} propagate 是否沿祖先链传播（chkboxType 含 p 时为 true）
    */
-  private applySingleNodeChecked(node: YTreeModel): void {
+  private applySingleNodeChecked(
+    node: YTreeModel,
+    propagate: boolean = true,
+  ): void {
     const oldState = this.getNodeCheckedState(node.id);
     const newState = this.resolveNodeState(node);
 
@@ -1677,7 +1899,9 @@ export class YTreeService {
       return;
     }
 
-    this.propagateCheckedState(node.id, oldState, newState);
+    if (propagate) {
+      this.propagateCheckedState(node.id, oldState, newState);
+    }
 
     // 叶子节点统计同步（叶子状态仅 checked/unchecked 两态）
     if (this.isLeafNode(node)) {
@@ -1691,10 +1915,12 @@ export class YTreeService {
    * 用于联动勾选（linkage）与复制新子树（isNewSubtree=true）
    * @param {NodeId} rootId 子树根节点id
    * @param {boolean} isNewSubtree 是否为全新子树（新增叶子计入 treeLeafTotal）
+   * @param {boolean} propagate 是否沿祖先链向上传播（chkboxType 含 p 时为 true）
    */
   private rebuildSubtreeCheckedStatus(
     rootId: NodeId,
     isNewSubtree: boolean = false,
+    propagate: boolean = true,
   ): void {
     if (
       !this.flatNodesMap ||
@@ -1770,9 +1996,11 @@ export class YTreeService {
       this.syncTreeCheckedStatus();
     }
 
-    // 子树根状态变化 → 沿祖先链向上传播
-    const rootNewState = this.nodeCheckedStateMap.get(rootId) || "unchecked";
-    this.propagateCheckedState(rootId, rootOldState, rootNewState);
+    // 子树根状态变化 → 按需沿祖先链向上传播
+    if (propagate) {
+      const rootNewState = this.nodeCheckedStateMap.get(rootId) || "unchecked";
+      this.propagateCheckedState(rootId, rootOldState, rootNewState);
+    }
   }
 
   /**

@@ -12,6 +12,7 @@ import { BasicGroupComponent } from './demo/groups/basic-group.component';
 import { StateGroupComponent } from './demo/groups/state-group.component';
 import { InteractionGroupComponent } from './demo/groups/interaction-group.component';
 import { AsyncGroupComponent } from './demo/groups/async-group.component';
+import { CheckGroupComponent } from './demo/groups/check-group.component';
 import { EditGroupComponent } from './demo/groups/edit-group.component';
 import { DragGroupComponent } from './demo/groups/drag-group.component';
 import { PerfGroupComponent } from './demo/groups/perf-group.component';
@@ -25,6 +26,7 @@ import { PerfGroupComponent } from './demo/groups/perf-group.component';
     StateGroupComponent,
     InteractionGroupComponent,
     AsyncGroupComponent,
+    CheckGroupComponent,
     EditGroupComponent,
     DragGroupComponent,
     PerfGroupComponent,

@@ -25,6 +25,9 @@ export type {
   YTreeAsyncEvent,
   YTreeAsyncSuccessEvent,
   YTreeAsyncErrorEvent,
+  YTreeChkStyle,
+  YTreeRadioType,
+  YTreeChkboxType,
 } from './common/model';
 
 // 懒加载根节点异步时使用的虚拟根节点 id

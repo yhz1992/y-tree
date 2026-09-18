@@ -9,6 +9,28 @@ export type NodeId = string | number;
 export type YTreeCheckedState = "unchecked" | "indeterminate" | "checked";
 
 /**
+ * 勾选控件样式：复选框 / 单选框（对标 zTree chkStyle）
+ */
+export type YTreeChkStyle = "checkbox" | "radio";
+
+/**
+ * radio 互斥范围（对标 zTree radioType）
+ * all = 整树只能勾选一个；level = 同一父节点下的兄弟互斥
+ */
+export type YTreeRadioType = "all" | "level";
+
+/**
+ * 父子联动方向（对标 zTree chkboxType）
+ * Y = 勾选时影响的方向；N = 取消勾选时影响的方向
+ * 字符含 "p" 表示影响祖先，含 "s" 表示影响子孙；空字符串表示不联动
+ * 默认 { Y: "ps", N: "ps" } 即双向联动
+ */
+export interface YTreeChkboxType {
+  Y?: string;
+  N?: string;
+}
+
+/**
  * 整树勾选汇总
  */
 export interface YTreeCheckedSummary {
@@ -333,4 +355,3 @@ export interface YTreeAsyncErrorEvent extends YTreeAsyncEvent {
    */
   error: any;
 }
-

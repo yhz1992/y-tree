@@ -78,20 +78,26 @@
         (click)="$event.stopPropagation()"
       >
         <input
-          type="checkbox"
+          [type]="chkStyle === 'radio' ? 'radio' : 'checkbox'"
           class="y-tree-checkbox-input"
           [checked]="!!item.node.checked"
-          [indeterminate]="!!item.node.halfChecked"
+          [indeterminate]="chkStyle !== 'radio' && !!item.node.halfChecked"
           [disabled]="!!item.node.disabled || !!item.node.checkboxDisabled"
           (change)="onCheckedChange($event, item.id)"
         />
         <i
           class="fa-regular y-tree-checkbox-icon"
-          [ngClass]="{
-            'fa-square': !item.node.checked && !item.node.halfChecked,
-            'fa-square-minus': !!item.node.halfChecked,
-            'fa-square-check': !!item.node.checked
-          }"
+          [ngClass]="
+            chkStyle === 'radio'
+              ? item.node.checked
+                ? 'fa-circle-dot'
+                : 'fa-circle'
+              : item.node.checked
+              ? 'fa-square-check'
+              : item.node.halfChecked
+              ? 'fa-square-minus'
+              : 'fa-square'
+          "
         ></i>
       </label>
 

@@ -816,12 +816,52 @@ export class AsyncRootComponent {
 ];
 
 /* ================================================================== */
+/* 勾选增强 · P4                                                       */
+/* ================================================================== */
+
+const checkDemos: Array<DemoMeta> = [
+  {
+    id: 'radio-all',
+    title: '单选 · 整树互斥',
+    desc: 'chkStyle="radio" + radioType="all"：整棵树只能勾选一个节点，勾选新节点会清掉旧的。',
+    code: `<y-tree [datasource]="data" [checkable]="true" chkStyle="radio" radioType="all"></y-tree>`,
+  },
+  {
+    id: 'radio-level',
+    title: '单选 · 同级互斥',
+    desc: 'radioType="level"：同一父节点下的兄弟互斥，跨级可以同时勾选。',
+    code: `<y-tree [datasource]="data" [checkable]="true" chkStyle="radio" radioType="level"></y-tree>`,
+  },
+  {
+    id: 'chkbox-type',
+    title: '联动方向',
+    desc: 'chkboxType 控制父子联动方向：Y/N 分别对应勾选与取消，p=祖先、s=子孙。',
+    code: `<y-tree [datasource]="data" [checkable]="true" [chkboxType]="{ Y: 's', N: 's' }"></y-tree>`,
+  },
+  {
+    id: 'check-all',
+    title: '全选 / 全不选',
+    desc: '通过组件实例的 checkAllNodes(true) / cancelAllNodes() 全选或全不选。radio 模式下全选无效。',
+    code: `this.tree.checkAllNodes(true);
+this.tree.cancelAllNodes();`,
+  },
+  {
+    id: 'check-node',
+    title: '程序化勾选',
+    desc: 'checkNode(id, checked) 程序化勾选（可改 disabled）；getChangeCheckedNodes() 返回相对 init 快照发生变化的节点。',
+    code: `this.tree.checkNode("1-1", true);
+const changed = this.tree.getChangeCheckedNodes();`,
+  },
+];
+
+/* ================================================================== */
 
 export const demoGroups: Array<DemoGroup> = [
   { id: 'group-basic', title: '基础', demos: basicDemos },
   { id: 'group-state', title: '节点状态', demos: stateDemos },
   { id: 'group-interaction', title: '数据与交互', demos: interactionDemos },
   { id: 'group-async', title: '异步加载 · P3', demos: asyncDemos },
+  { id: 'group-check', title: '勾选增强 · P4', demos: checkDemos },
   { id: 'group-edit', title: '编辑 · P1', demos: editDemos },
   { id: 'group-drag', title: '拖拽 · P2', demos: dragDemos },
   { id: 'group-perf', title: '性能 · P7', demos: perfDemos },

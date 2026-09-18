@@ -20,8 +20,11 @@ import type {
   YTreeAsyncEvent,
   YTreeAsyncFrom,
   YTreeAsyncSuccessEvent,
+  YTreeChkboxType,
+  YTreeChkStyle,
   YTreeNodeEvent,
   YTreeFlatNode,
+  YTreeRadioType,
   YTreeRemoveEvent,
   YTreeRenameEvent,
   YTreeDragEvent,
@@ -60,6 +63,18 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * checkable 状态下节点选择完全受控（父子节点选中状态不再关联）
    */
   @Input() checkStrictly: boolean = false;
+  /**
+   * 勾选控件样式：checkbox（默认）/ radio
+   */
+  @Input() chkStyle: YTreeChkStyle = 'checkbox';
+  /**
+   * radio 互斥范围：all=整树（默认）/ level=同级兄弟
+   */
+  @Input() radioType: YTreeRadioType = 'all';
+  /**
+   * 父子联动方向（对标 zTree chkboxType）
+   */
+  @Input() chkboxType?: YTreeChkboxType;
   /**
    * 节点是否可拖拽
    */
@@ -383,6 +398,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
       undefined,
       this.toSetOrNull(this.expandIds),
       undefined
+    );
+    this.service.configureCheckMode(
+      this.chkStyle,
+      this.radioType,
+      this.checkStrictly ? { Y: '', N: '' } : this.chkboxType ?? null
     );
 
     // 初始化展开集合
@@ -1106,6 +1126,42 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   public getCheckedList(): Array<YTreeModel> {
     return this.service?.getCheckedList() ?? [];
+  }
+
+  /**
+   * 程序化勾选（可改 disabled 节点）
+   */
+  public checkNode(
+    id: NodeId,
+    checked: boolean,
+    linkage: boolean = true
+  ): boolean {
+    const ok = this.service?.checkNode(id, checked, linkage) ?? false;
+    if (ok) this.updateView();
+    return ok;
+  }
+
+  /**
+   * 全选 / 全不选（radio 模式下全选无效）
+   */
+  public checkAllNodes(checked: boolean = true): boolean {
+    const ok = this.service?.checkAllNodes(checked) ?? false;
+    if (ok) this.updateView();
+    return ok;
+  }
+
+  /**
+   * 全不选
+   */
+  public cancelAllNodes(): boolean {
+    return this.checkAllNodes(false);
+  }
+
+  /**
+   * 相对 init 快照，勾选状态发生变化的节点
+   */
+  public getChangeCheckedNodes(): Array<YTreeModel> {
+    return this.service?.getChangeCheckedNodes() ?? [];
   }
 
   /**
