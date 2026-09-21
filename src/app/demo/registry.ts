@@ -445,11 +445,11 @@ export class AddComponent {
   {
     id: 'node-extra',
     title: '自定义节点内容',
-    desc: 'ng-template #nodeExtra 在节点标题后渲染自定义内容，对标 zTree 的 addDiyDom。',
+    desc: 'ng-template #nodeExtra 在节点标题后渲染自定义内容。',
     code: `@Component({
   selector: "app-node-extra",
   template: \`
-    <!-- nodeExtra 模板对标 zTree addDiyDom -->
+    <!-- nodeExtra 模板 -->
     <y-tree [datasource]="data" [expandAll]="true">
       <ng-template #nodeExtra let-node>
         <span class="tag">
@@ -914,10 +914,10 @@ const idx = this.tree.getNodeIndex("1-2");`,
   {
     id: 'transform',
     title: '结构转换',
-    desc: 'transformToArray / transformTozTreeNodes 互转当前树；transformTozTreeNodesFromFlat 把扁数据转嵌套，不碰当前树。',
+    desc: 'transformToArray / transformToTreeNodes 互转当前树；transformToTreeNodesFromFlat 把扁数据转嵌套，不碰当前树。',
     code: `const flat = this.tree.transformToArray();
-const nested = this.tree.transformTozTreeNodes();
-const rebuilt = this.tree.transformTozTreeNodesFromFlat(flatNodes);`,
+const nested = this.tree.transformToTreeNodes();
+const rebuilt = this.tree.transformToTreeNodesFromFlat(flatNodes);`,
   },
   {
     id: 'update-node',

@@ -5,7 +5,7 @@
   [style.--y-tree-expand-speed]="expandMs + 'ms'"
   (scroll)="onVirtualScroll($event)"
 >
-  <!-- 自定义节点 DOM 模板投影（对标 zTree addDiyDom，使用方传入 ng-template 并添加 nodeExtra 引用） -->
+  <!-- 自定义节点 DOM 模板投影（使用方传入 ng-template 并添加 nodeExtra 引用） -->
   <ng-content select="ng-template[nodeExtra]"></ng-content>
   <div
     class="y-tree-virtual-spacer"

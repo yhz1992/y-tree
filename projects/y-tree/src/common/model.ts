@@ -6,21 +6,21 @@ export type NodeId = string | number;
 /**
  * 节点勾选状态
  */
-export type YTreeCheckedState = "unchecked" | "indeterminate" | "checked";
+export type YTreeCheckedState = 'unchecked' | 'indeterminate' | 'checked';
 
 /**
- * 勾选控件样式：复选框 / 单选框（对标 zTree chkStyle）
+ * 勾选控件样式：复选框 / 单选框
  */
-export type YTreeChkStyle = "checkbox" | "radio";
+export type YTreeChkStyle = 'checkbox' | 'radio';
 
 /**
- * radio 互斥范围（对标 zTree radioType）
+ * radio 互斥范围
  * all = 整树只能勾选一个；level = 同一父节点下的兄弟互斥
  */
-export type YTreeRadioType = "all" | "level";
+export type YTreeRadioType = 'all' | 'level';
 
 /**
- * 父子联动方向（对标 zTree chkboxType）
+ * 父子联动方向
  * Y = 勾选时影响的方向；N = 取消勾选时影响的方向
  * 字符含 "p" 表示影响祖先，含 "s" 表示影响子孙；空字符串表示不联动
  * 默认 { Y: "ps", N: "ps" } 即双向联动
@@ -31,10 +31,10 @@ export interface YTreeChkboxType {
 }
 
 /**
- * 展开动画速度（对标 zTree expandSpeed）
+ * 展开动画速度
  * 数字 = 毫秒；fast=200；slow=400；false / "" / 0 = 关闭动画
  */
-export type YTreeExpandSpeed = number | false | "" | "fast" | "slow";
+export type YTreeExpandSpeed = number | false | '' | 'fast' | 'slow';
 
 /**
  * 整树勾选汇总
@@ -129,7 +129,7 @@ export interface YTreeModel extends YTreeFlatNode {
 }
 
 /**
- * 节点标题字体样式（对标 zTree fontCss）
+ * 节点标题字体样式
  * 对象则整树共用；函数则按节点返回（返回空表示不覆盖）
  */
 export type YTreeFontCss =
@@ -191,23 +191,23 @@ interface YTreeBaseNode {
    */
   isParent?: boolean;
   /**
-   * 自定义节点图标（CSS class 或图片 URL，对标 zTree icon）
+   * 自定义节点图标（CSS class 或图片 URL）
    */
   icon?: string;
   /**
-   * 父节点展开时的图标（对标 zTree iconOpen）
+   * 父节点展开时的图标
    */
   iconOpen?: string;
   /**
-   * 父节点折叠时的图标（对标 zTree iconClose）
+   * 父节点折叠时的图标
    */
   iconClose?: string;
   /**
-   * 图标皮肤名，渲染为 `y-tree-icon-skin-${iconSkin}`（对标 zTree iconSkin）
+   * 图标皮肤名，渲染为 `y-tree-icon-skin-${iconSkin}`
    */
   iconSkin?: string;
   /**
-   * 鼠标悬停提示，缺省回退为 name（对标 zTree title）
+   * 鼠标悬停提示，缺省回退为 name
    */
   title?: string;
   [key: string]: any;
@@ -280,7 +280,7 @@ export interface YTreeDragMoveEvent extends YTreeNodeEvent {
   /** 目标节点id */
   targetId: string | number;
   /** 当前落点 */
-  position: "inner" | "prev" | "next";
+  position: 'inner' | 'prev' | 'next';
   /** 是否复制模式 */
   isCopy: boolean;
 }
@@ -295,11 +295,11 @@ export interface YTreeDropEvent extends YTreeNodeEvent {
   /** 目标节点id */
   targetId: string | number;
   /** 落点 */
-  position: "inner" | "prev" | "next";
+  position: 'inner' | 'prev' | 'next';
   /** 是否复制模式 */
   isCopy: boolean;
   /** 移动类型：move=移动，copy=复制 */
-  moveType: "move" | "copy";
+  moveType: 'move' | 'copy';
 }
 
 /**
@@ -320,7 +320,7 @@ export interface YTreeNodeChangeEvent extends YTreeNodeEvent {
   /**
    * 落点：inner=成为目标子节点，prev=插入目标之前，next=插入目标之后
    */
-  position: "inner" | "prev" | "next";
+  position: 'inner' | 'prev' | 'next';
 }
 
 export interface DataSource<M extends Array<YTreeNode | YTreeFlatNode>> {
@@ -340,7 +340,7 @@ export interface DataSource<M extends Array<YTreeNode | YTreeFlatNode>> {
  * 异步加载触发来源：
  * user=用户展开节点触发；api=程序化调用 reAsyncChildNodes
  */
-export type YTreeAsyncFrom = "user" | "api";
+export type YTreeAsyncFrom = 'user' | 'api';
 
 /**
  * 异步加载事件基类（懒加载 P3）

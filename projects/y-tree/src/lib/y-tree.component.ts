@@ -80,7 +80,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   @Input() radioType: YTreeRadioType = 'all';
   /**
-   * 父子联动方向（对标 zTree chkboxType）
+   * 父子联动方向
    */
   @Input() chkboxType?: YTreeChkboxType;
   /**
@@ -200,11 +200,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   @Input() height: number = 400;
   /**
-   * 是否显示节点图标（对标 zTree showIcon）
+   * 是否显示节点图标
    */
   @Input() showIcon: boolean = true;
   /**
-   * 是否显示悬停 title（对标 zTree showTitle）
+   * 是否显示悬停 title
    */
   @Input() showTitle: boolean = true;
   /**
@@ -212,19 +212,19 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   @Input() title?: (node: YTreeModel) => string;
   /**
-   * 节点标题字体样式（对标 zTree fontCss）
+   * 节点标题字体样式
    */
   @Input() fontCss?: YTreeFontCss;
   /**
-   * 双击标题是否展开/折叠（对标 zTree dblClickExpand），默认 true
+   * 双击标题是否展开/折叠，默认 true
    */
   @Input() dblClickExpand: boolean = true;
   /**
-   * 展开动画速度（对标 zTree expandSpeed），默认关闭
+   * 展开动画速度，默认关闭
    */
   @Input() expandSpeed: YTreeExpandSpeed = 0;
   /**
-   * 是否允许多选文本选中（对标 zTree selectedMulti），默认 true
+   * 是否允许多选文本选中，默认 true
    */
   @Input() selectedMulti: boolean = true;
   /**
@@ -306,7 +306,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   @Output() asyncError = new EventEmitter<any>();
   /**
-   * 自定义节点 DOM 模板（对标 zTree addDiyDom）
+   * 自定义节点 DOM 模板
    */
   @ContentChild('nodeExtra', { static: false })
   nodeExtraTemplate: TemplateRef<any> | null = null;
@@ -1371,15 +1371,15 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   }
 
   /** 当前树还原嵌套 */
-  public transformTozTreeNodes(parentId?: NodeId): Array<YTreeNode> {
-    return this.service?.transformTozTreeNodes(parentId) ?? [];
+  public transformToTreeNodes(parentId?: NodeId): Array<YTreeNode> {
+    return this.service?.transformToTreeNodes(parentId) ?? [];
   }
 
   /** 扁数据 id/pId → 嵌套（不碰当前树） */
-  public transformTozTreeNodesFromFlat(
+  public transformToTreeNodesFromFlat(
     nodes: Array<YTreeFlatNode>
   ): Array<YTreeNode> {
-    return this.service?.transformTozTreeNodesFromFlat(nodes) ?? [];
+    return this.service?.transformToTreeNodesFromFlat(nodes) ?? [];
   }
 
   /**

@@ -33,9 +33,9 @@ import { basicData } from '../data';
       </div>
       <p class="demo-tip">
         <code>transformToArray</code> DFS 扁平；<code
-          >transformTozTreeNodes</code
+          >transformToTreeNodes</code
         >
-        还原嵌套；<code>transformTozTreeNodesFromFlat</code>
+        还原嵌套；<code>transformToTreeNodesFromFlat</code>
         不碰当前树，仅把 id/pId 列表转嵌套。
       </p>
       <pre class="demo-log">{{ transformLog }}</pre>
@@ -159,7 +159,7 @@ export class ApiGroupComponent {
   }
 
   doToNested(): void {
-    const nested = this.transformTree.transformTozTreeNodes();
+    const nested = this.transformTree.transformToTreeNodes();
     const summarize = (nodes: Array<any>): string =>
       nodes
         .map(
@@ -167,11 +167,11 @@ export class ApiGroupComponent {
             `${n.name}[${(n.children ?? []).map((c: any) => c.name).join(',')}]`
         )
         .join('；');
-    this.transformLog = `transformTozTreeNodes()｜${summarize(nested)}`;
+    this.transformLog = `transformToTreeNodes()｜${summarize(nested)}`;
   }
 
   doFromFlat(): void {
-    const nested = this.transformTree.transformTozTreeNodesFromFlat([
+    const nested = this.transformTree.transformToTreeNodesFromFlat([
       { id: 'a', name: 'A', pId: '' },
       { id: 'a-1', name: 'A-1', pId: 'a' },
       { id: 'b', name: 'B', pId: '' },

@@ -8,13 +8,13 @@ import type {
   YTreeModel,
   YTreeNode,
   YTreeRadioType,
-} from "./model";
+} from './model';
 
 /**
  * 懒加载「根节点异步」时使用的虚拟根节点 id
  * datasource 为空且开启 lazy 时，loadData 会收到以该 id 构造的虚拟根节点
  */
-export const Y_TREE_ROOT_ID = "__yt_root__";
+export const Y_TREE_ROOT_ID = '__yt_root__';
 
 /**
  * 节点直接子节点的状态计数（增量更新用）
@@ -29,7 +29,7 @@ type ChildStateCount = {
 /**
  * 节点勾选状态（"" 表示节点不存在，用于新增/删除节点的计数增减）
  */
-type CheckedStateLike = YTreeCheckedState | "";
+type CheckedStateLike = YTreeCheckedState | '';
 
 export class YTreeService {
   constructor(
@@ -39,7 +39,7 @@ export class YTreeService {
     nocheckIds: Set<string | number> | null = null,
     disabledIds: Set<string | number> | null = null,
     expandIds: Set<string | number> | null = null,
-    hideIds: Set<string | number> | null = null,
+    hideIds: Set<string | number> | null = null
   ) {
     this.checkIds = checkIds;
     this.checkIdsControlled = checkIds !== null;
@@ -56,7 +56,7 @@ export class YTreeService {
    * @type {NodeId}
    * 根节点父id占位符
    */
-  private readonly ROOT_PARENT_ID: NodeId = "";
+  private readonly ROOT_PARENT_ID: NodeId = '';
 
   /**
    * @type { Map<NodeId, YTreeModel> }
@@ -168,17 +168,17 @@ export class YTreeService {
   /**
    * 勾选控件样式（checkbox / radio）
    */
-  private chkStyle: YTreeChkStyle = "checkbox";
+  private chkStyle: YTreeChkStyle = 'checkbox';
 
   /**
    * radio 互斥范围（all = 整树；level = 同级兄弟）
    */
-  private radioType: YTreeRadioType = "all";
+  private radioType: YTreeRadioType = 'all';
 
   /**
    * 父子联动方向（Y=勾选时，N=取消勾选时；p=祖先，s=子孙）
    */
-  private chkboxType: { Y: string; N: string } = { Y: "ps", N: "ps" };
+  private chkboxType: { Y: string; N: string } = { Y: 'ps', N: 'ps' };
 
   /**
    * 最近一次 init 时的勾选快照（getChangeCheckedNodes 对比用）
@@ -225,15 +225,15 @@ export class YTreeService {
    * @param {YTreeChkboxType | null} chkboxType 父子联动方向，null 表示默认双向 { Y: "ps", N: "ps" }
    */
   public configureCheckMode(
-    chkStyle: YTreeChkStyle = "checkbox",
-    radioType: YTreeRadioType = "all",
-    chkboxType: YTreeChkboxType | null = null,
+    chkStyle: YTreeChkStyle = 'checkbox',
+    radioType: YTreeRadioType = 'all',
+    chkboxType: YTreeChkboxType | null = null
   ): void {
-    this.chkStyle = chkStyle === "radio" ? "radio" : "checkbox";
-    this.radioType = radioType === "level" ? "level" : "all";
+    this.chkStyle = chkStyle === 'radio' ? 'radio' : 'checkbox';
+    this.radioType = radioType === 'level' ? 'level' : 'all';
     this.chkboxType = {
-      Y: typeof chkboxType?.Y === "string" ? chkboxType.Y : "ps",
-      N: typeof chkboxType?.N === "string" ? chkboxType.N : "ps",
+      Y: typeof chkboxType?.Y === 'string' ? chkboxType.Y : 'ps',
+      N: typeof chkboxType?.N === 'string' ? chkboxType.N : 'ps',
     };
   }
 
@@ -247,7 +247,7 @@ export class YTreeService {
   public setCheckedByUser(
     id: NodeId,
     checked: boolean,
-    linkage: boolean = true,
+    linkage: boolean = true
   ): boolean {
     return this.setCheckedStatus(id, checked, false, linkage);
   }
@@ -262,13 +262,13 @@ export class YTreeService {
   public setCheckedByApi(
     id: NodeId,
     checked: boolean,
-    linkage: boolean = true,
+    linkage: boolean = true
   ): boolean {
     return this.setCheckedStatus(id, checked, true, linkage);
   }
 
   /**
-   * 程序化勾选（对标 zTree checkNode，走 API 通道，可改 disabled 节点）
+   * 程序化勾选（走 API 通道，可改 disabled 节点）
    * @param {NodeId} id 节点id
    * @param {boolean} checked 目标勾选状态
    * @param {boolean} linkage 是否按 chkboxType 联动，默认 true
@@ -276,13 +276,13 @@ export class YTreeService {
   public checkNode(
     id: NodeId,
     checked: boolean,
-    linkage: boolean = true,
+    linkage: boolean = true
   ): boolean {
     return this.setCheckedByApi(id, checked, linkage);
   }
 
   /**
-   * 全选 / 全不选（对标 zTree checkAllNodes）
+   * 全选 / 全不选
    * radio 模式下全选无意义，仅全不选生效
    * nocheck / checkboxDisabled 节点跳过；disabled 节点按 API 通道可改
    * @param {boolean} checked true=全选，false=全不选
@@ -292,7 +292,7 @@ export class YTreeService {
     if (!this.flatNodesMap) {
       return false;
     }
-    if (this.chkStyle === "radio" && checked) {
+    if (this.chkStyle === 'radio' && checked) {
       return false;
     }
 
@@ -313,14 +313,14 @@ export class YTreeService {
   }
 
   /**
-   * 全不选（对标 zTree cancelSelectedNode 的勾选版 cancelAllNodes）
+   * 全不选
    */
   public cancelAllNodes(): boolean {
     return this.checkAllNodes(false);
   }
 
   /**
-   * 相对 init 时快照，勾选状态发生变化的节点（对标 zTree getChangeCheckedNodes）
+   * 相对 init 时快照，勾选状态发生变化的节点
    * 不含 nocheck 节点
    */
   public getChangeCheckedNodes(): Array<YTreeModel> {
@@ -360,7 +360,7 @@ export class YTreeService {
   }
 
   /**
-   * 选中节点文本区（对标 zTree selectNode）
+   * 选中节点文本区
    * @param {NodeId} id 节点id
    * @param {boolean} addFlag true=追加选中（多选），false=替换为仅该节点
    */
@@ -390,7 +390,7 @@ export class YTreeService {
   }
 
   /**
-   * 取消文本区选中（对标 zTree cancelSelectedNode）
+   * 取消文本区选中
    * @param {NodeId} [id] 缺省则清空全部选中
    */
   public cancelSelectedNode(id?: NodeId): boolean {
@@ -418,7 +418,7 @@ export class YTreeService {
   }
 
   /**
-   * 当前文本区选中节点（对标 zTree getSelectedNodes）
+   * 当前文本区选中节点
    */
   public getSelectedNodes(): Array<YTreeModel> {
     const list: Array<YTreeModel> = [];
@@ -443,7 +443,7 @@ export class YTreeService {
   }
 
   /**
-   * 根节点列表（对标 zTree getNodes）
+   * 根节点列表
    */
   public getNodes(): Array<YTreeModel> {
     const list: Array<YTreeModel> = [];
@@ -457,30 +457,30 @@ export class YTreeService {
   }
 
   /**
-   * 按属性精确匹配（对标 zTree getNodesByParam）
+   * 按属性精确匹配
    * parentId 有值时只搜该子树（含自身）
    */
   public getNodesByParam(
     key: string,
     value: unknown,
-    parentId?: NodeId,
+    parentId?: NodeId
   ): Array<YTreeModel> {
     return this.collectByParam(key, value, parentId, false);
   }
 
   /**
-   * 按属性模糊匹配（对标 zTree getNodesByParamFuzzy），忽略大小写
+   * 按属性模糊匹配，忽略大小写
    */
   public getNodesByParamFuzzy(
     key: string,
     value: unknown,
-    parentId?: NodeId,
+    parentId?: NodeId
   ): Array<YTreeModel> {
     return this.collectByParam(key, value, parentId, true);
   }
 
   /**
-   * 节点在兄弟中的下标（对标 zTree getNodeIndex），找不到返回 -1
+   * 节点在兄弟中的下标，找不到返回 -1
    */
   public getNodeIndex(id: NodeId): number {
     const node = this.flatNodesMap?.get(id);
@@ -495,13 +495,13 @@ export class YTreeService {
   }
 
   /**
-   * 热更新展示字段（对标 zTree updateNode）
+   * 热更新展示字段
    * 不改 id / pId / childIds / level 等结构字段
    * checked 走 checkNode；selected 走 selectNode / cancelSelectedNode
    */
   public updateNode(
     id: NodeId,
-    patch: Partial<YTreeModel> | Record<string, unknown> = {},
+    patch: Partial<YTreeModel> | Record<string, unknown> = {}
   ): boolean {
     const node = this.flatNodesMap?.get(id);
     if (!node || !patch) {
@@ -515,7 +515,7 @@ export class YTreeService {
         return;
       }
       const next = data[field];
-      if (typeof next !== "string") {
+      if (typeof next !== 'string') {
         return;
       }
       if ((node as Record<string, unknown>)[field] === next) {
@@ -536,24 +536,24 @@ export class YTreeService {
       changed = true;
     };
 
-    setStr("name");
-    setStr("title");
-    setStr("icon");
-    setStr("iconOpen");
-    setStr("iconClose");
-    setStr("iconSkin");
-    setBool("disabled");
-    setBool("hide");
-    setBool("nocheck");
-    setBool("checkboxDisabled");
+    setStr('name');
+    setStr('title');
+    setStr('icon');
+    setStr('iconOpen');
+    setStr('iconClose');
+    setStr('iconSkin');
+    setBool('disabled');
+    setBool('hide');
+    setBool('nocheck');
+    setBool('checkboxDisabled');
 
-    if ("checked" in data) {
-      if (this.checkNode(id, !!data["checked"])) {
+    if ('checked' in data) {
+      if (this.checkNode(id, !!data['checked'])) {
         changed = true;
       }
     }
-    if ("selected" in data) {
-      const ok = data["selected"]
+    if ('selected' in data) {
+      const ok = data['selected']
         ? this.selectNode(id, true)
         : this.cancelSelectedNode(id);
       if (ok) {
@@ -565,7 +565,7 @@ export class YTreeService {
   }
 
   /**
-   * 当前树 DFS 扁平列表（对标 zTree transformToArray）
+   * 当前树 DFS 扁平列表
    */
   public transformToArray(parentId?: NodeId): Array<YTreeModel> {
     const list: Array<YTreeModel> = [];
@@ -594,9 +594,9 @@ export class YTreeService {
   }
 
   /**
-   * 当前树还原为嵌套结构（对标 zTree transformTozTreeNodes）
+   * 当前树还原为嵌套结构
    */
-  public transformTozTreeNodes(parentId?: NodeId): Array<YTreeNode> {
+  public transformToTreeNodes(parentId?: NodeId): Array<YTreeNode> {
     const build = (ids: Array<NodeId>): Array<YTreeNode> => {
       const result: Array<YTreeNode> = [];
       for (const id of ids) {
@@ -624,8 +624,8 @@ export class YTreeService {
   /**
    * 纯函数：id/pId 扁数据 → 嵌套（不碰当前树）
    */
-  public transformTozTreeNodesFromFlat(
-    nodes: Array<YTreeFlatNode>,
+  public transformToTreeNodesFromFlat(
+    nodes: Array<YTreeFlatNode>
   ): Array<YTreeNode> {
     const list = Array.isArray(nodes) ? nodes : [];
     const childrenMap = new Map<NodeId, Array<YTreeFlatNode>>();
@@ -669,17 +669,21 @@ export class YTreeService {
     key: string,
     value: unknown,
     parentId: NodeId | undefined,
-    fuzzy: boolean,
+    fuzzy: boolean
   ): Array<YTreeModel> {
     const list: Array<YTreeModel> = [];
     if (!this.flatNodesMap || !key) {
       return list;
     }
-    const needle = fuzzy ? String(value ?? "").toLowerCase() : value;
+    const needle = fuzzy ? String(value ?? '').toLowerCase() : value;
     const match = (node: YTreeModel): boolean => {
       const actual = (node as Record<string, unknown>)[key];
       if (fuzzy) {
-        return String(actual ?? "").toLowerCase().indexOf(needle as string) >= 0;
+        return (
+          String(actual ?? '')
+            .toLowerCase()
+            .indexOf(needle as string) >= 0
+        );
       }
       return actual === value;
     };
@@ -725,7 +729,7 @@ export class YTreeService {
    */
   public toggleCheckedByUser(id: NodeId, linkage: boolean = true): boolean {
     const state = this.getNodeCheckedState(id);
-    return this.setCheckedByUser(id, state !== "checked", linkage);
+    return this.setCheckedByUser(id, state !== 'checked', linkage);
   }
 
   /**
@@ -741,7 +745,7 @@ export class YTreeService {
    * @param {NodeId} id 节点id
    */
   public getNodeCheckedState(id: NodeId): YTreeCheckedState {
-    return this.nodeCheckedStateMap?.get(id) || "unchecked";
+    return this.nodeCheckedStateMap?.get(id) || 'unchecked';
   }
 
   /**
@@ -751,14 +755,14 @@ export class YTreeService {
     this.ensureLeafStats();
     const state = this.resolveCheckedState(
       this.treeLeafChecked,
-      this.treeLeafTotal,
+      this.treeLeafTotal
     );
     return {
       rootIds: [...this.rootIds],
       totalLeaf: this.treeLeafTotal,
       checkedLeaf: this.treeLeafChecked,
-      checked: state === "checked",
-      indeterminate: state === "indeterminate",
+      checked: state === 'checked',
+      indeterminate: state === 'indeterminate',
       state,
     };
   }
@@ -845,7 +849,7 @@ export class YTreeService {
   public moveNode(
     sourceId: NodeId,
     targetId: NodeId,
-    position: "inner" | "prev" | "next",
+    position: 'inner' | 'prev' | 'next'
   ): boolean {
     if (!this.flatNodesMap || !this.levelMap) {
       return false;
@@ -872,7 +876,7 @@ export class YTreeService {
       return false;
     }
 
-    const newLevel = position === "inner" ? target.level + 1 : target.level;
+    const newLevel = position === 'inner' ? target.level + 1 : target.level;
 
     // 搬运语义：子树内部状态不变，仅同步原父/新父的计数并沿祖先链增量传播
     const sourceState = this.getNodeCheckedState(sourceId);
@@ -882,13 +886,13 @@ export class YTreeService {
 
     this.detachNode(source);
     // 从原父移除：原父计数减去 source 贡献，向上传播
-    this.propagateCheckedState(sourceId, sourceState, "");
+    this.propagateCheckedState(sourceId, sourceState, '');
 
     this.attachNode(source, target, position);
     this.rebuildSubtreeLevel(source, newLevel);
     this.rebuildLevelMap();
     // 挂到新父：新父计数加上 source 贡献，向上传播
-    this.propagateCheckedState(sourceId, "", sourceState);
+    this.propagateCheckedState(sourceId, '', sourceState);
 
     return true;
   }
@@ -904,7 +908,7 @@ export class YTreeService {
   public copyNode(
     sourceId: NodeId,
     targetId: NodeId,
-    position: "inner" | "prev" | "next",
+    position: 'inner' | 'prev' | 'next'
   ): NodeId | null {
     if (!this.flatNodesMap || !this.levelMap) {
       return null;
@@ -942,11 +946,11 @@ export class YTreeService {
       const newNode: YTreeModel = {
         ...old,
         id: newId,
-        pId: "", // 先占位，稍后统一映射
+        pId: '', // 先占位，稍后统一映射
         isRoot: false,
         childIds: [], // 先占位
-        preId: "",
-        nextId: "",
+        preId: '',
+        nextId: '',
         index: 0,
         isFirst: false,
         isLast: false,
@@ -964,14 +968,14 @@ export class YTreeService {
         // pId映射
         if (oldId === sourceId) {
           // 根节点：pId由attachNode决定
-          newNode.pId = "";
+          newNode.pId = '';
         } else if (oldIdToNewId.has(old.pId)) {
-          newNode.pId = oldIdToNewId.get(old.pId) ?? "";
+          newNode.pId = oldIdToNewId.get(old.pId) ?? '';
         }
         // childIds映射
         newNode.childIds = old.childIds
-          .map((cid) => oldIdToNewId.get(cid) ?? "")
-          .filter((id) => id !== "");
+          .map((cid) => oldIdToNewId.get(cid) ?? '')
+          .filter((id) => id !== '');
       }
     }
 
@@ -988,7 +992,7 @@ export class YTreeService {
       return null;
     }
 
-    const newLevel = position === "inner" ? target.level + 1 : target.level;
+    const newLevel = position === 'inner' ? target.level + 1 : target.level;
     this.attachNode(rootNewNode, target, position);
     this.rebuildSubtreeLevel(rootNewNode, newLevel);
     this.rebuildLevelMap();
@@ -1011,7 +1015,7 @@ export class YTreeService {
     if (!node) {
       return false;
     }
-    const name = typeof newName === "string" ? newName.trim() : "";
+    const name = typeof newName === 'string' ? newName.trim() : '';
     if (!name || name === node.name) {
       return false;
     }
@@ -1050,7 +1054,7 @@ export class YTreeService {
     }
 
     // 增量传播：被删子树根从父节点计数中移除（需在删除 map 之前执行）
-    this.propagateCheckedState(id, this.getNodeCheckedState(id), "");
+    this.propagateCheckedState(id, this.getNodeCheckedState(id), '');
 
     // 移除内部数据结构
     for (const rid of removedIds) {
@@ -1075,7 +1079,7 @@ export class YTreeService {
   public addNode(
     parentId: NodeId,
     data: Partial<YTreeNode> = {},
-    index: number = -1,
+    index: number = -1
   ): NodeId | null {
     if (!this.flatNodesMap || !this.levelMap) {
       return null;
@@ -1086,8 +1090,8 @@ export class YTreeService {
     }
 
     const _data = { ...(data as Record<string, any>) };
-    let id = _data["id"] as NodeId;
-    if (id === undefined || id === null || id === "") {
+    let id = _data['id'] as NodeId;
+    if (id === undefined || id === null || id === '') {
       id = this.generateNodeId();
     }
     if (this.flatNodesMap.has(id)) {
@@ -1101,7 +1105,7 @@ export class YTreeService {
     const source: YTreeNode = {
       ...(_data as YTreeNode),
       id,
-      name: typeof _data["name"] === "string" ? _data["name"] : "新建节点",
+      name: typeof _data['name'] === 'string' ? _data['name'] : '新建节点',
       children: [],
     };
 
@@ -1113,15 +1117,15 @@ export class YTreeService {
       childIds.length + 1,
       [],
       childIds[insertIndex - 1] ?? this.ROOT_PARENT_ID,
-      childIds[insertIndex] ?? this.ROOT_PARENT_ID,
+      childIds[insertIndex] ?? this.ROOT_PARENT_ID
     );
 
     // createFlatNode 的受控判断依赖 this.checkIds（可能已被 rebuildCheckedStatus 汇总结果覆盖），
     // 这里按初始受控语义显式修正新节点勾选状态
     if (this.checkIdsControlled) {
       node.checked = !!this.checkIds?.has(id);
-    } else if (typeof _data["checked"] === "boolean") {
-      node.checked = _data["checked"];
+    } else if (typeof _data['checked'] === 'boolean') {
+      node.checked = _data['checked'];
     }
     if (node.nocheck) {
       node.checked = true;
@@ -1134,15 +1138,15 @@ export class YTreeService {
 
     // 新节点状态（叶子，nocheck 视为勾选）
     const newState = this.getResolvedLeafChecked(node)
-      ? "checked"
-      : "unchecked";
+      ? 'checked'
+      : 'unchecked';
     this.applyStateToNode(node, newState);
 
     // 结构变更：叶子汇总标记失效（读取时惰性重算）
     this.leafStatsDirty = true;
 
     // 增量传播：父节点计数加上新节点贡献，向上传播
-    this.propagateCheckedState(id, "", newState);
+    this.propagateCheckedState(id, '', newState);
 
     return id;
   }
@@ -1168,7 +1172,7 @@ export class YTreeService {
     const id = Y_TREE_ROOT_ID;
     return {
       id,
-      name: "root",
+      name: 'root',
       pId: this.ROOT_PARENT_ID,
       level: 0,
       index: 0,
@@ -1242,7 +1246,7 @@ export class YTreeService {
   public setNodeChildren(
     parentId: NodeId,
     children: Array<YTreeNode | YTreeFlatNode>,
-    append: boolean = false,
+    append: boolean = false
   ): Array<NodeId> {
     if (!this.flatNodesMap || !this.levelMap) {
       return [];
@@ -1270,7 +1274,7 @@ export class YTreeService {
         return;
       }
       added.push(id);
-      const nested = raw["children"];
+      const nested = raw['children'];
       if (Array.isArray(nested) && nested.length > 0) {
         for (const child of nested) {
           insertOne(id, child as YTreeNode);
@@ -1396,7 +1400,7 @@ export class YTreeService {
         current.len,
         childIds,
         current.preId,
-        current.nextId,
+        current.nextId
       );
 
       this.flatNodesMap?.set(flatNode.id, flatNode);
@@ -1511,7 +1515,7 @@ export class YTreeService {
         current.len,
         childIds,
         current.preId,
-        current.nextId,
+        current.nextId
       );
 
       this.flatNodesMap?.set(flatNode.id, flatNode);
@@ -1583,7 +1587,7 @@ export class YTreeService {
         current.len,
         childIds,
         current.preId,
-        current.nextId,
+        current.nextId
       );
 
       this.flatNodesMap?.set(flatNode.id, flatNode);
@@ -1623,32 +1627,32 @@ export class YTreeService {
     len: number,
     childIds: Array<NodeId>,
     preId: NodeId,
-    nextId: NodeId,
+    nextId: NodeId
   ): YTreeModel {
     const _source: Record<string, any> = { ...(source as Record<string, any>) };
-    delete _source["children"];
+    delete _source['children'];
 
-    const id = _source["id"] as NodeId;
-    const nocheck = !!_source["nocheck"] || !!this.nocheckIds?.has(id);
-    const disabled = !!_source["disabled"] || !!this.disabledIds?.has(id);
+    const id = _source['id'] as NodeId;
+    const nocheck = !!_source['nocheck'] || !!this.nocheckIds?.has(id);
+    const disabled = !!_source['disabled'] || !!this.disabledIds?.has(id);
     const selected =
       this.selectedIds !== null
         ? this.selectedIds.has(id)
-        : !!_source["selected"];
+        : !!_source['selected'];
     const expanded =
-      this.expandIds !== null ? this.expandIds.has(id) : !!_source["expanded"];
+      this.expandIds !== null ? this.expandIds.has(id) : !!_source['expanded'];
     const hide =
-      this.hideIds !== null ? this.hideIds.has(id) : !!_source["hide"];
+      this.hideIds !== null ? this.hideIds.has(id) : !!_source['hide'];
     const checked = nocheck
       ? true
       : this.checkIds !== null
       ? this.checkIds.has(id)
-      : !!_source["checked"];
+      : !!_source['checked'];
 
     const flatNode: YTreeModel = {
       ..._source,
       id,
-      name: typeof _source["name"] === "string" ? _source["name"] : "",
+      name: typeof _source['name'] === 'string' ? _source['name'] : '',
       pId,
       level,
       index,
@@ -1681,7 +1685,7 @@ export class YTreeService {
     id: NodeId,
     checked: boolean,
     fromApi: boolean,
-    linkage: boolean,
+    linkage: boolean
   ): boolean {
     const targetNode = this.flatNodesMap?.get(id);
     if (!targetNode) {
@@ -1694,14 +1698,14 @@ export class YTreeService {
     }
 
     // radio 模式：勾选时先清互斥范围内的其它节点
-    if (this.chkStyle === "radio" && checked) {
+    if (this.chkStyle === 'radio' && checked) {
       this.clearRadioGroup(id, fromApi);
     }
 
     // radio 互斥已保证整树/同级只有一个勾选，再向下联动会破坏互斥，故 radio 不联动子孙
     const affectChildren =
       linkage &&
-      this.chkStyle !== "radio" &&
+      this.chkStyle !== 'radio' &&
       this.shouldAffectChildren(checked);
     const affectParent = linkage && this.shouldAffectParent(checked);
 
@@ -1739,7 +1743,7 @@ export class YTreeService {
           (targetNode.childIds || []).length > 0
         ) {
           const oldState = this.getNodeCheckedState(targetNode.id);
-          const newState: YTreeCheckedState = checked ? "checked" : "unchecked";
+          const newState: YTreeCheckedState = checked ? 'checked' : 'unchecked';
           this.applyStateToNode(targetNode, newState);
           if (affectParent && oldState !== newState) {
             this.propagateCheckedState(targetNode.id, oldState, newState);
@@ -1747,7 +1751,7 @@ export class YTreeService {
         } else {
           this.applySingleNodeChecked(
             targetNode,
-            linkage ? affectParent : true,
+            linkage ? affectParent : true
           );
         }
       }
@@ -1761,7 +1765,7 @@ export class YTreeService {
    */
   private shouldAffectChildren(checked: boolean): boolean {
     const dir = checked ? this.chkboxType.Y : this.chkboxType.N;
-    return dir.indexOf("s") >= 0;
+    return dir.indexOf('s') >= 0;
   }
 
   /**
@@ -1769,7 +1773,7 @@ export class YTreeService {
    */
   private shouldAffectParent(checked: boolean): boolean {
     const dir = checked ? this.chkboxType.Y : this.chkboxType.N;
-    return dir.indexOf("p") >= 0;
+    return dir.indexOf('p') >= 0;
   }
 
   /**
@@ -1783,7 +1787,7 @@ export class YTreeService {
     }
 
     const ids: Array<NodeId> = [];
-    if (this.radioType === "level") {
+    if (this.radioType === 'level') {
       const siblings = this.getSiblingList(keep);
       if (siblings) {
         for (let i = 0; i < siblings.length; i++) {
@@ -1936,12 +1940,12 @@ export class YTreeService {
   private isSamePosition(
     source: YTreeModel,
     target: YTreeModel,
-    position: "inner" | "prev" | "next",
+    position: 'inner' | 'prev' | 'next'
   ): boolean {
-    if (position === "inner") {
+    if (position === 'inner') {
       return source.pId === target.id;
     }
-    if (position === "prev") {
+    if (position === 'prev') {
       return source.nextId === target.id;
     }
     return source.preId === target.id;
@@ -1973,9 +1977,9 @@ export class YTreeService {
   private attachNode(
     node: YTreeModel,
     target: YTreeModel,
-    position: "inner" | "prev" | "next",
+    position: 'inner' | 'prev' | 'next'
   ): void {
-    if (position === "inner") {
+    if (position === 'inner') {
       const childIds = target.childIds;
       childIds.push(node.id);
       node.pId = target.id;
@@ -1989,7 +1993,7 @@ export class YTreeService {
       return;
     }
     const targetIndex = siblings.indexOf(target.id);
-    const insertIndex = position === "prev" ? targetIndex : targetIndex + 1;
+    const insertIndex = position === 'prev' ? targetIndex : targetIndex + 1;
     if (insertIndex < 0) {
       return;
     }
@@ -2087,10 +2091,10 @@ export class YTreeService {
         continue;
       }
       const childState = this.getNodeCheckedState(childId);
-      if (childState === "checked" || childState === "indeterminate") {
+      if (childState === 'checked' || childState === 'indeterminate') {
         counts.checked++;
       }
-      if (childState === "unchecked" || childState === "indeterminate") {
+      if (childState === 'unchecked' || childState === 'indeterminate') {
         counts.unchecked++;
       }
     }
@@ -2105,18 +2109,18 @@ export class YTreeService {
    */
   private resolveStateByCounts(
     node: YTreeModel,
-    counts: ChildStateCount | undefined,
+    counts: ChildStateCount | undefined
   ): YTreeCheckedState {
     if (!counts || (counts.checked === 0 && counts.unchecked === 0)) {
-      return this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
+      return this.getResolvedLeafChecked(node) ? 'checked' : 'unchecked';
     }
     if (counts.unchecked === 0) {
-      return "checked";
+      return 'checked';
     }
     if (counts.checked === 0) {
-      return "unchecked";
+      return 'unchecked';
     }
-    return "indeterminate";
+    return 'indeterminate';
   }
 
   /**
@@ -2130,18 +2134,18 @@ export class YTreeService {
     node: YTreeModel,
     state: YTreeCheckedState,
     stateMap: Map<NodeId, YTreeCheckedState> | null = null,
-    syncCheckIds: boolean = true,
+    syncCheckIds: boolean = true
   ): void {
     const map = stateMap || this.nodeCheckedStateMap;
     if (!map) {
       return;
     }
 
-    const preChecked = map.get(node.id) === "checked";
-    if (state === "checked") {
+    const preChecked = map.get(node.id) === 'checked';
+    if (state === 'checked') {
       node.checked = true;
       node.halfChecked = false;
-    } else if (state === "unchecked") {
+    } else if (state === 'unchecked') {
       node.checked = false;
       node.halfChecked = false;
     } else {
@@ -2168,12 +2172,12 @@ export class YTreeService {
   private adjustStateCount(
     counts: ChildStateCount,
     state: CheckedStateLike,
-    delta: number,
+    delta: number
   ): void {
-    if (state === "checked" || state === "indeterminate") {
+    if (state === 'checked' || state === 'indeterminate') {
       counts.checked += delta;
     }
-    if (state === "unchecked" || state === "indeterminate") {
+    if (state === 'unchecked' || state === 'indeterminate') {
       counts.unchecked += delta;
     }
   }
@@ -2188,7 +2192,7 @@ export class YTreeService {
   private propagateCheckedState(
     id: NodeId,
     oldState: CheckedStateLike,
-    newState: CheckedStateLike,
+    newState: CheckedStateLike
   ): void {
     if (
       oldState === newState ||
@@ -2224,7 +2228,7 @@ export class YTreeService {
 
       // 重算父节点状态
       const parentOldState =
-        this.nodeCheckedStateMap.get(parent.id) || "unchecked";
+        this.nodeCheckedStateMap.get(parent.id) || 'unchecked';
       const parentNewState = this.resolveStateByCounts(parent, counts);
       this.applyStateToNode(parent, parentNewState);
 
@@ -2245,11 +2249,11 @@ export class YTreeService {
    */
   private resolveNodeState(node: YTreeModel): YTreeCheckedState {
     if ((node.childIds || []).length === 0) {
-      return this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
+      return this.getResolvedLeafChecked(node) ? 'checked' : 'unchecked';
     }
     return this.resolveStateByCounts(
       node,
-      this.childStateCountMap?.get(node.id),
+      this.childStateCountMap?.get(node.id)
     );
   }
 
@@ -2261,7 +2265,7 @@ export class YTreeService {
    */
   private applySingleNodeChecked(
     node: YTreeModel,
-    propagate: boolean = true,
+    propagate: boolean = true
   ): void {
     const oldState = this.getNodeCheckedState(node.id);
     const newState = this.resolveNodeState(node);
@@ -2294,7 +2298,7 @@ export class YTreeService {
   private rebuildSubtreeCheckedStatus(
     rootId: NodeId,
     isNewSubtree: boolean = false,
-    propagate: boolean = true,
+    propagate: boolean = true
   ): void {
     if (
       !this.flatNodesMap ||
@@ -2308,7 +2312,7 @@ export class YTreeService {
       return;
     }
 
-    const rootOldState = this.nodeCheckedStateMap.get(rootId) || "";
+    const rootOldState = this.nodeCheckedStateMap.get(rootId) || '';
 
     // 收集子树节点并按 level 分组（自底向上局部重建）
     const subtreeIds = this.collectSubtreeNodeIds(rootId);
@@ -2347,10 +2351,10 @@ export class YTreeService {
         if (isLeaf) {
           const preChecked = isNewSubtree
             ? false
-            : this.nodeCheckedStateMap.get(subNode.id) === "checked";
+            : this.nodeCheckedStateMap.get(subNode.id) === 'checked';
           const state = this.getResolvedLeafChecked(subNode)
-            ? "checked"
-            : "unchecked";
+            ? 'checked'
+            : 'unchecked';
           this.applyStateToNode(subNode, state);
           // 联动勾选：增量维护勾选叶子数（结构变更后由惰性重算兜底）
           if (!isNewSubtree) {
@@ -2361,7 +2365,7 @@ export class YTreeService {
           this.childStateCountMap.set(subNode.id, counts);
           this.applyStateToNode(
             subNode,
-            this.resolveStateByCounts(subNode, counts),
+            this.resolveStateByCounts(subNode, counts)
           );
         }
       }
@@ -2372,7 +2376,7 @@ export class YTreeService {
 
     // 子树根状态变化 → 按需沿祖先链向上传播
     if (propagate) {
-      const rootNewState = this.nodeCheckedStateMap.get(rootId) || "unchecked";
+      const rootNewState = this.nodeCheckedStateMap.get(rootId) || 'unchecked';
       this.propagateCheckedState(rootId, rootOldState, rootNewState);
     }
   }
@@ -2450,11 +2454,11 @@ export class YTreeService {
             continue;
           }
           childCount++;
-          const childState = nodeStateMap.get(childId) || "unchecked";
-          if (childState === "checked" || childState === "indeterminate") {
+          const childState = nodeStateMap.get(childId) || 'unchecked';
+          if (childState === 'checked' || childState === 'indeterminate') {
             counts.checked++;
           }
-          if (childState === "unchecked" || childState === "indeterminate") {
+          if (childState === 'unchecked' || childState === 'indeterminate') {
             counts.unchecked++;
           }
         }
@@ -2466,17 +2470,17 @@ export class YTreeService {
 
         let state: YTreeCheckedState;
         if (childCount === 0) {
-          state = this.getResolvedLeafChecked(node) ? "checked" : "unchecked";
+          state = this.getResolvedLeafChecked(node) ? 'checked' : 'unchecked';
           treeLeafTotal++;
-          if (state === "checked") {
+          if (state === 'checked') {
             treeLeafChecked++;
           }
         } else if (counts.unchecked === 0) {
-          state = "checked";
+          state = 'checked';
         } else if (counts.checked === 0) {
-          state = "unchecked";
+          state = 'unchecked';
         } else {
-          state = "indeterminate";
+          state = 'indeterminate';
         }
 
         this.applyStateToNode(node, state, nodeStateMap, false);
@@ -2531,7 +2535,7 @@ export class YTreeService {
    */
   private resolveFlatNodeParentId(
     node: YTreeFlatNode,
-    sourceMap: Map<NodeId, YTreeFlatNode>,
+    sourceMap: Map<NodeId, YTreeFlatNode>
   ): NodeId {
     const pId = node.pId;
     if (pId === undefined || pId === null || pId === this.ROOT_PARENT_ID) {
@@ -2575,14 +2579,14 @@ export class YTreeService {
    */
   private resolveCheckedState(
     checked: number,
-    total: number,
+    total: number
   ): YTreeCheckedState {
     if (total <= 0 || checked <= 0) {
-      return "unchecked";
+      return 'unchecked';
     }
     if (checked >= total) {
-      return "checked";
+      return 'checked';
     }
-    return "indeterminate";
+    return 'indeterminate';
   }
 }
