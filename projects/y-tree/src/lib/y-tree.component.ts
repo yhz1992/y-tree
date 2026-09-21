@@ -13,10 +13,18 @@ import {
 } from '@angular/core';
 import { YTreeService } from '../common/service';
 import {
+  buildVisibleNodes,
+  collectVisibleDescendants,
   parseExpandSpeed,
+  patchVisibleAfterAdd,
+  patchVisibleAfterCopy,
+  patchVisibleAfterMove,
+  patchVisibleAfterRemove,
   resolveFontCss,
   resolveNodeIcon,
   resolveNodeTitle,
+  shouldRebuildVisibleAfterUpdate,
+  type VisibleNode,
 } from '../common/view';
 import type {
   NodeId,
@@ -314,7 +322,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   /**
    * 可见节点列表（扁平化渲染）
    */
-  protected visibleNodes: Array<{ id: NodeId; node: YTreeModel }> = [];
+  protected visibleNodes: Array<VisibleNode> = [];
 
   /**
    * 拖拽状态：正在拖拽的节点id
@@ -412,7 +420,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   /**
    * 展开动画定时器
    */
-  private expandTimer: ReturnType<typeof setTimeout> | 0 = 0;
+  private expandTimer: ReturnType<typeof setTimeout> | number = 0;
 
   constructor(private ref: ChangeDetectorRef) {}
 
@@ -498,42 +506,36 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * 重建可见节点列表（按展开状态 DFS，命中 searchValue 过滤）
    */
   private rebuildVisibleNodes(): void {
-    const flatMap = this.service?.getFlatNodesMap();
-    const list: Array<{ id: NodeId; node: YTreeModel }> = [];
-    if (!flatMap) {
-      this.visibleNodes = list;
-      return;
-    }
-
-    // 根顺序以 service.getRootIds() 为准（moveNode 会更新此顺序）
-    const rootIds: Array<NodeId> = this.service?.getRootIds() ?? [];
-
-    const stack: Array<NodeId> = [...rootIds].reverse();
-    while (stack.length) {
-      const id = stack.pop() as NodeId;
-      const node = flatMap.get(id);
-      if (!node || node.hide) {
-        continue;
-      }
-      if (this.searchValue && node.name.indexOf(this.searchValue) === -1) {
-        continue;
-      }
-      list.push({ id, node });
-      if (node.childIds.length > 0 && this.expandedIds.has(id)) {
-        for (let i = node.childIds.length - 1; i >= 0; i--) {
-          stack.push(node.childIds[i]);
-        }
-      } else if (this.leaving && this.leaving.parentId === id) {
-        for (const lid of this.leaving.ids) {
-          const child = flatMap.get(lid);
-          if (child && !child.hide) {
-            list.push({ id: lid, node: child });
-          }
-        }
-      }
-    }
-    this.visibleNodes = list;
+    this.visibleNodes = buildVisibleNodes(this.service, this.expandedIds, {
+      searchValue: this.searchValue,
+      leaving: this.leaving,
+    });
     this.updateVisibleSlice();
+  }
+
+  /**
+   * 勾选/选中/重命名：节点已原地更新，换数组引用刷新行
+   */
+  private bumpRows(): void {
+    this.visibleNodes = this.visibleNodes.slice();
+    this.updateVisibleSlice();
+    this.ref.markForCheck();
+  }
+
+  /**
+   * 结构变更增量补丁；失败则全量重建
+   */
+  private applyStructurePatch(
+    run: (list: Array<VisibleNode>) => boolean
+  ): void {
+    const list = this.visibleNodes;
+    if (run(list)) {
+      this.visibleNodes = list.slice();
+      this.updateVisibleSlice();
+      this.ref.markForCheck();
+    } else {
+      this.updateView();
+    }
   }
 
   /**
@@ -807,7 +809,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     if (node && !node.disabled) {
       const addFlag = this.selectedMulti && (event.ctrlKey || event.metaKey);
       this.service?.selectNode(id, addFlag);
-      this.updateView();
+      this.bumpRows();
     }
     this.click.emit(payload);
   }
@@ -846,6 +848,27 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   }
 
   /**
+   * 虚拟滚动行 trackBy
+   */
+  protected trackByVisibleId(_index: number, item: VisibleNode): NodeId {
+    return item.id;
+  }
+
+  /**
+   * 展开进入动画中
+   */
+  protected isEntering(id: NodeId): boolean {
+    return this.enteringIds.has(id);
+  }
+
+  /**
+   * 收起离开动画中
+   */
+  protected isLeaving(id: NodeId): boolean {
+    return !!this.leaving && this.leaving.ids.indexOf(id) >= 0;
+  }
+
+  /**
    * 展开按钮事件
    * @param event
    * @param id
@@ -875,7 +898,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     if (expandMs > 0) {
       window.clearTimeout(this.expandTimer);
       if (next) {
-        const enterIds = this.collectVisibleDescendants(id, this.expandedIds);
+        const enterIds = collectVisibleDescendants(
+          this.service,
+          id,
+          this.expandedIds
+        );
         this.leaving = null;
         this.enteringIds = new Set(enterIds);
         this.expandTimer = window.setTimeout(() => {
@@ -883,7 +910,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
           this.ref.markForCheck();
         }, expandMs);
       } else {
-        const leaveIds = this.collectVisibleDescendants(id, this.expandedIds);
+        const leaveIds = collectVisibleDescendants(
+          this.service,
+          id,
+          this.expandedIds
+        );
         this.enteringIds = new Set();
         this.leaving = { parentId: id, ids: leaveIds };
         this.expandTimer = window.setTimeout(() => {
@@ -917,7 +948,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const ok = this.service?.setCheckedByUser(id, checked, !this.checkStrictly);
     if (ok) {
       this.checkedChange.emit(payload);
-      this.updateView();
+      this.bumpRows();
     }
   }
 
@@ -1094,6 +1125,27 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     }
 
     if (ok) {
+      if (copyMode && resultId != null) {
+        this.applyStructurePatch((list) =>
+          patchVisibleAfterCopy(
+            list,
+            this.service!,
+            this.expandedIds,
+            resultId as NodeId,
+            this.searchValue
+          )
+        );
+      } else {
+        this.applyStructurePatch((list) =>
+          patchVisibleAfterMove(
+            list,
+            this.service!,
+            this.expandedIds,
+            sourceId,
+            this.searchValue
+          )
+        );
+      }
       this.drop.emit({
         event,
         id: resultId ?? sourceId,
@@ -1110,7 +1162,6 @@ export class YTreeComponent implements OnChanges, OnDestroy {
         targetId: id,
         position: target.position,
       });
-      this.updateView();
     }
   }
 
@@ -1182,7 +1233,11 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     const ok = this.service?.renameNode(id, newName);
     if (ok) {
       this.rename.emit(payload);
-      this.updateView();
+      if (this.searchValue) {
+        this.updateView();
+      } else {
+        this.bumpRows();
+      }
     }
   }
 
@@ -1227,7 +1282,9 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     if (removed.length > 0) {
       removed.forEach((rid) => this.expandedIds.delete(rid));
       this.remove.emit({ event, id });
-      this.updateView();
+      this.applyStructurePatch((list) =>
+        patchVisibleAfterRemove(list, removed)
+      );
     }
   }
 
@@ -1245,9 +1302,21 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     }
     const newId = this.service?.addNode(id, { name: '新建节点' });
     if (newId != null) {
-      this.expandedIds.add(id);
       this.add.emit({ event, id: newId, parentId: id });
-      this.updateView();
+      if (this.expandedIds.has(id)) {
+        this.applyStructurePatch((list) =>
+          patchVisibleAfterAdd(
+            list,
+            this.service!,
+            this.expandedIds,
+            newId,
+            this.searchValue
+          )
+        );
+      } else {
+        this.expandedIds.add(id);
+        this.updateView();
+      }
     }
   }
 
@@ -1275,7 +1344,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     linkage: boolean = true
   ): boolean {
     const ok = this.service?.checkNode(id, checked, linkage) ?? false;
-    if (ok) this.updateView();
+    if (ok) this.bumpRows();
     return ok;
   }
 
@@ -1284,7 +1353,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   public checkAllNodes(checked: boolean = true): boolean {
     const ok = this.service?.checkAllNodes(checked) ?? false;
-    if (ok) this.updateView();
+    if (ok) this.bumpRows();
     return ok;
   }
 
@@ -1307,7 +1376,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   public selectNode(id: NodeId, addFlag: boolean = false): boolean {
     const ok = this.service?.selectNode(id, addFlag) ?? false;
-    if (ok) this.updateView();
+    if (ok) this.bumpRows();
     return ok;
   }
 
@@ -1316,7 +1385,7 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   public cancelSelectedNode(id?: NodeId): boolean {
     const ok = this.service?.cancelSelectedNode(id) ?? false;
-    if (ok) this.updateView();
+    if (ok) this.bumpRows();
     return ok;
   }
 
@@ -1361,7 +1430,13 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     patch?: Partial<YTreeModel> | Record<string, unknown>
   ): boolean {
     const ok = this.service?.updateNode(id, patch) ?? false;
-    if (ok) this.updateView();
+    if (ok) {
+      if (shouldRebuildVisibleAfterUpdate(patch, this.searchValue)) {
+        this.updateView();
+      } else {
+        this.bumpRows();
+      }
+    }
     return ok;
   }
 
@@ -1489,7 +1564,17 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     position: 'inner' | 'prev' | 'next'
   ): boolean {
     const ok = this.service?.moveNode(sourceId, targetId, position) ?? false;
-    if (ok) this.updateView();
+    if (ok) {
+      this.applyStructurePatch((list) =>
+        patchVisibleAfterMove(
+          list,
+          this.service!,
+          this.expandedIds,
+          sourceId,
+          this.searchValue
+        )
+      );
+    }
     return ok;
   }
 
@@ -1502,7 +1587,17 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     position: 'inner' | 'prev' | 'next'
   ): NodeId | null {
     const newId = this.service?.copyNode(sourceId, targetId, position) ?? null;
-    if (newId != null) this.updateView();
+    if (newId != null) {
+      this.applyStructurePatch((list) =>
+        patchVisibleAfterCopy(
+          list,
+          this.service!,
+          this.expandedIds,
+          newId,
+          this.searchValue
+        )
+      );
+    }
     return newId;
   }
 
@@ -1534,50 +1629,6 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   protected nodeFontCss(node: YTreeModel): Record<string, string> {
     return resolveFontCss(node, this.fontCss);
-  }
-
-  /**
-   * 是否处于展开进入动画
-   */
-  protected isEntering(id: NodeId): boolean {
-    return this.enteringIds.has(id);
-  }
-
-  /**
-   * 是否处于收起离开动画
-   */
-  protected isLeaving(id: NodeId): boolean {
-    return !!this.leaving && this.leaving.ids.indexOf(id) >= 0;
-  }
-
-  /**
-   * 收集当前可见的子孙节点（展开动画进入/离开用）
-   */
-  private collectVisibleDescendants(
-    parentId: NodeId,
-    expandedSet: Set<NodeId>
-  ): Array<NodeId> {
-    const ids: Array<NodeId> = [];
-    const flatMap = this.service?.getFlatNodesMap();
-    const parent = flatMap?.get(parentId);
-    if (!flatMap || !parent) {
-      return ids;
-    }
-    const stack: Array<NodeId> = [...parent.childIds].reverse();
-    while (stack.length) {
-      const cid = stack.pop() as NodeId;
-      const child = flatMap.get(cid);
-      if (!child || child.hide) {
-        continue;
-      }
-      ids.push(cid);
-      if (child.childIds.length > 0 && expandedSet.has(cid)) {
-        for (let i = child.childIds.length - 1; i >= 0; i--) {
-          stack.push(child.childIds[i]);
-        }
-      }
-    }
-    return ids;
   }
 
   ngOnDestroy(): void {

@@ -628,7 +628,7 @@ const perfDemos: Array<DemoMeta> = [
   {
     id: 'large-data',
     title: '虚拟滚动 · 大数据量',
-    desc: 'height 指定滚动容器高度，组件只渲染视口内的节点。13.7 万节点全部展开时，实际 DOM 数量仍保持在几十个，连接线与父子联动勾选也保持毫秒级响应。',
+    desc: 'height 指定滚动容器高度，组件只渲染视口内的节点。13.7 万节点全部展开时，实际 DOM 数量仍保持在几十个；勾选、拖拽、编辑都走增量更新，避免全量重建可见列表。',
     code: `@Component({
   selector: "app-large-data",
   // height 指定滚动容器高度，组件内部只渲染视口内的节点

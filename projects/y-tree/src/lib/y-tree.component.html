@@ -16,7 +16,7 @@
     [style.transform]="'translateY(' + start * ROW_HEIGHT + 'px)'"
   >
     <div
-      *ngFor="let item of visibleSlice"
+      *ngFor="let item of visibleSlice; trackBy: trackByVisibleId"
       class="y-tree-node"
       [ngClass]="{
         'is-root': item.node.isRoot,
