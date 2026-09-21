@@ -122,6 +122,67 @@
   cursor: not-allowed;
 }
 
+.y-tree-node-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  font-size: 14px;
+  color: #f5a623;
+  flex: none;
+}
+
+.y-tree-node-icon.is-leaf {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.y-tree-node-icon-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.y-tree-icon-skin-p5.is-open,
+.y-tree-icon-skin-p5.is-close {
+  color: #1677ff;
+}
+
+.y-tree-icon-skin-p5.is-docu {
+  color: #52c41a;
+}
+
+.y-tree-node.is-expand-enter {
+  animation: y-tree-expand-in var(--y-tree-expand-speed, 200ms) ease-out;
+}
+
+.y-tree-node.is-expand-leave {
+  animation: y-tree-expand-out var(--y-tree-expand-speed, 200ms) ease-in
+    forwards;
+}
+
+@keyframes y-tree-expand-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes y-tree-expand-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
 .y-tree-title {
   padding: 2px 4px;
   border-radius: 3px;

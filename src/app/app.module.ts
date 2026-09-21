@@ -13,6 +13,8 @@ import { StateGroupComponent } from './demo/groups/state-group.component';
 import { InteractionGroupComponent } from './demo/groups/interaction-group.component';
 import { AsyncGroupComponent } from './demo/groups/async-group.component';
 import { CheckGroupComponent } from './demo/groups/check-group.component';
+import { ViewGroupComponent } from './demo/groups/view-group.component';
+import { ApiGroupComponent } from './demo/groups/api-group.component';
 import { EditGroupComponent } from './demo/groups/edit-group.component';
 import { DragGroupComponent } from './demo/groups/drag-group.component';
 import { PerfGroupComponent } from './demo/groups/perf-group.component';
@@ -27,6 +29,8 @@ import { PerfGroupComponent } from './demo/groups/perf-group.component';
     InteractionGroupComponent,
     AsyncGroupComponent,
     CheckGroupComponent,
+    ViewGroupComponent,
+    ApiGroupComponent,
     EditGroupComponent,
     DragGroupComponent,
     PerfGroupComponent,

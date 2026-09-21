@@ -2,6 +2,7 @@
   class="y-tree"
   [ngClass]="['y-tree-' + size, className]"
   [style.height.px]="height"
+  [style.--y-tree-expand-speed]="expandMs + 'ms'"
   (scroll)="onVirtualScroll($event)"
 >
   <!-- 自定义节点 DOM 模板投影（对标 zTree addDiyDom，使用方传入 ng-template 并添加 nodeExtra 引用） -->
@@ -23,6 +24,8 @@
         'is-last': item.node.isLast,
         'is-selected': item.node.selected,
         'is-disabled': item.node.disabled,
+        'is-expand-enter': isEntering(item.id),
+        'is-expand-leave': isLeaving(item.id),
         'is-dragging': draggingId === item.id,
         'is-drop-inner':
           dropTarget &&
@@ -49,7 +52,8 @@
         class="y-tree-indent"
         [class.y-tree-indent-leaf]="!hasChildren(item.id)"
         [style.width.px]="
-          item.node.level * 24 + (!hasChildren(item.id) ? 16 : 0)
+          (item.node.level + (hasRootLine ? 1 : 0)) * 24 +
+          (!hasChildren(item.id) ? 16 : 0)
         "
         [style.background]="indentBg(item.node)"
       ></span>
@@ -101,6 +105,30 @@
         ></i>
       </label>
 
+      <img
+        *ngIf="
+          nodeIcon(item.node, isExpanded(item.id), hasChildren(item.id))
+            .type === 'img'
+        "
+        class="y-tree-node-icon y-tree-node-icon-img"
+        [class.is-leaf]="!hasChildren(item.id)"
+        [src]="
+          nodeIcon(item.node, isExpanded(item.id), hasChildren(item.id)).src
+        "
+        alt=""
+      />
+      <i
+        *ngIf="
+          nodeIcon(item.node, isExpanded(item.id), hasChildren(item.id))
+            .type === 'class'
+        "
+        class="y-tree-node-icon"
+        [ngClass]="
+          nodeIcon(item.node, isExpanded(item.id), hasChildren(item.id))
+            .className
+        "
+        [class.is-leaf]="!hasChildren(item.id)"
+      ></i>
       <input
         *ngIf="editingId === item.id"
         class="y-tree-edit-input"
@@ -116,6 +144,8 @@
         *ngIf="editingId !== item.id"
         class="y-tree-title"
         [ngClass]="{ 'is-link': showLine }"
+        [attr.title]="nodeTitle(item.node) || null"
+        [ngStyle]="nodeFontCss(item.node)"
         (dblclick)="onDbClick($event, item.id); startEdit($event, item.id)"
       >
         {{ item.node.name }}

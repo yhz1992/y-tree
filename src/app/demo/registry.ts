@@ -855,6 +855,100 @@ const changed = this.tree.getChangeCheckedNodes();`,
 ];
 
 /* ================================================================== */
+/* 展示增强 · P5                                                       */
+/* ================================================================== */
+
+const viewDemos: Array<DemoMeta> = [
+  {
+    id: 'node-icon',
+    title: '自定义图标',
+    desc: 'icon / iconOpen / iconClose / iconSkin 自定义节点图标；showIcon 控制显隐。未指定时父节点显示文件夹、叶子显示文档。',
+    code: `<y-tree [datasource]="data" [showIcon]="true"></y-tree>`,
+  },
+  {
+    id: 'font-css',
+    title: '自定义字体',
+    desc: 'fontCss 按节点返回标题样式，用于高亮、标记。',
+    code: `<y-tree [datasource]="data" [fontCss]="fontCss"></y-tree>`,
+  },
+  {
+    id: 'node-title',
+    title: 'title 提示',
+    desc: '节点 title 透传到标题悬停提示，缺省回退为 name；showTitle=false 关闭。',
+    code: `<y-tree [datasource]="data" [showTitle]="true"></y-tree>`,
+  },
+  {
+    id: 'dblclick-expand',
+    title: '双击展开',
+    desc: 'dblClickExpand 控制双击标题是否展开/折叠，默认 true。开启编辑时双击优先进入重命名。',
+    code: `<y-tree [datasource]="data" [dblClickExpand]="true"></y-tree>`,
+  },
+  {
+    id: 'expand-speed',
+    title: '展开动画',
+    desc: 'expandSpeed 控制展开/折叠过渡：fast=200ms、slow=400ms、0 关闭（默认）。',
+    code: `<y-tree [datasource]="data" expandSpeed="fast"></y-tree>`,
+  },
+  {
+    id: 'selected-multi',
+    title: '多选文本选中',
+    desc: 'selectedMulti 控制 Ctrl/Cmd 是否追加选中；组件内部维护选中高亮，组件实例暴露 selectNode / cancelSelectedNode / getSelectedNodes。',
+    code: `<y-tree [datasource]="data" [selectedMulti]="true"></y-tree>`,
+  },
+];
+
+/* ================================================================== */
+/* 查询与操作 · P6                                                     */
+/* ================================================================== */
+
+const apiDemos: Array<DemoMeta> = [
+  {
+    id: 'query-nodes',
+    title: '批量查询',
+    desc: 'getNodes / getNodesByParam / getNodesByParamFuzzy / getNodeIndex：根列表、精确/模糊属性查询、兄弟下标。',
+    code: `const roots = this.tree.getNodes();
+const hits = this.tree.getNodesByParam("name", "节点 1-1");
+const fuzzy = this.tree.getNodesByParamFuzzy("name", "1-");
+const idx = this.tree.getNodeIndex("1-2");`,
+  },
+  {
+    id: 'transform',
+    title: '结构转换',
+    desc: 'transformToArray / transformTozTreeNodes 互转当前树；transformTozTreeNodesFromFlat 把扁数据转嵌套，不碰当前树。',
+    code: `const flat = this.tree.transformToArray();
+const nested = this.tree.transformTozTreeNodes();
+const rebuilt = this.tree.transformTozTreeNodesFromFlat(flatNodes);`,
+  },
+  {
+    id: 'update-node',
+    title: '节点更新',
+    desc: 'updateNode 热更新展示字段并刷新视图；结构字段 id/pId/childIds 会被忽略。',
+    code: `this.tree.updateNode("1-1", { name: "已改名" });
+this.tree.updateNode("2", { hide: true });`,
+  },
+  {
+    id: 'expand-node',
+    title: '精确展开',
+    desc: 'expandNode(id, expand?, sonSign?) 精确展开/折叠；expandCollapseParentNode 沿祖先链操作。',
+    code: `this.tree.expandNode("1", false);
+this.tree.expandNode("1", true, true);
+this.tree.expandCollapseParentNode("1-1", true);`,
+  },
+  {
+    id: 'before-hooks',
+    title: 'before* 拦截',
+    desc: 'beforeClick / beforeExpand / beforeCollapse / beforeCheck 返回 false 取消操作。点节点 2 拦点击、折叠节点 1 拦、勾选 1-1 拦。',
+    code: `<y-tree
+  [datasource]="data"
+  [checkable]="true"
+  [beforeClick]="beforeClick"
+  [beforeCollapse]="beforeCollapse"
+  [beforeCheck]="beforeCheck"
+></y-tree>`,
+  },
+];
+
+/* ================================================================== */
 
 export const demoGroups: Array<DemoGroup> = [
   { id: 'group-basic', title: '基础', demos: basicDemos },
@@ -862,6 +956,8 @@ export const demoGroups: Array<DemoGroup> = [
   { id: 'group-interaction', title: '数据与交互', demos: interactionDemos },
   { id: 'group-async', title: '异步加载 · P3', demos: asyncDemos },
   { id: 'group-check', title: '勾选增强 · P4', demos: checkDemos },
+  { id: 'group-view', title: '展示增强 · P5', demos: viewDemos },
+  { id: 'group-api', title: '查询与操作 · P6', demos: apiDemos },
   { id: 'group-edit', title: '编辑 · P1', demos: editDemos },
   { id: 'group-drag', title: '拖拽 · P2', demos: dragDemos },
   { id: 'group-perf', title: '性能 · P7', demos: perfDemos },

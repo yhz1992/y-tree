@@ -343,6 +343,381 @@ export class YTreeService {
   }
 
   /**
+   * 确保 selectedIds 为可变集合（非受控时从当前节点 selected 快照生成）
+   */
+  private ensureSelectedIds(): Set<NodeId> {
+    if (this.selectedIds) {
+      return this.selectedIds;
+    }
+    const next = new Set<NodeId>();
+    this.flatNodesMap?.forEach((node) => {
+      if (node.selected) {
+        next.add(node.id);
+      }
+    });
+    this.selectedIds = next;
+    return next;
+  }
+
+  /**
+   * 选中节点文本区（对标 zTree selectNode）
+   * @param {NodeId} id 节点id
+   * @param {boolean} addFlag true=追加选中（多选），false=替换为仅该节点
+   */
+  public selectNode(id: NodeId, addFlag: boolean = false): boolean {
+    const node = this.flatNodesMap?.get(id);
+    if (!node) {
+      return false;
+    }
+    const selected = this.ensureSelectedIds();
+    if (!addFlag) {
+      if (selected.size === 1 && selected.has(id) && node.selected) {
+        return false;
+      }
+      selected.forEach((sid) => {
+        const other = this.flatNodesMap?.get(sid);
+        if (other) {
+          other.selected = false;
+        }
+      });
+      selected.clear();
+    } else if (selected.has(id) && node.selected) {
+      return false;
+    }
+    selected.add(id);
+    node.selected = true;
+    return true;
+  }
+
+  /**
+   * 取消文本区选中（对标 zTree cancelSelectedNode）
+   * @param {NodeId} [id] 缺省则清空全部选中
+   */
+  public cancelSelectedNode(id?: NodeId): boolean {
+    const selected = this.ensureSelectedIds();
+    if (id === undefined) {
+      if (selected.size === 0) {
+        return false;
+      }
+      selected.forEach((sid) => {
+        const node = this.flatNodesMap?.get(sid);
+        if (node) {
+          node.selected = false;
+        }
+      });
+      selected.clear();
+      return true;
+    }
+    const node = this.flatNodesMap?.get(id);
+    if (!node || !selected.has(id)) {
+      return false;
+    }
+    selected.delete(id);
+    node.selected = false;
+    return true;
+  }
+
+  /**
+   * 当前文本区选中节点（对标 zTree getSelectedNodes）
+   */
+  public getSelectedNodes(): Array<YTreeModel> {
+    const list: Array<YTreeModel> = [];
+    if (!this.flatNodesMap) {
+      return list;
+    }
+    if (this.selectedIds) {
+      this.selectedIds.forEach((id) => {
+        const node = this.flatNodesMap?.get(id);
+        if (node && node.selected) {
+          list.push(node);
+        }
+      });
+      return list;
+    }
+    this.flatNodesMap.forEach((node) => {
+      if (node.selected) {
+        list.push(node);
+      }
+    });
+    return list;
+  }
+
+  /**
+   * 根节点列表（对标 zTree getNodes）
+   */
+  public getNodes(): Array<YTreeModel> {
+    const list: Array<YTreeModel> = [];
+    for (const id of this.rootIds) {
+      const node = this.flatNodesMap?.get(id);
+      if (node) {
+        list.push(node);
+      }
+    }
+    return list;
+  }
+
+  /**
+   * 按属性精确匹配（对标 zTree getNodesByParam）
+   * parentId 有值时只搜该子树（含自身）
+   */
+  public getNodesByParam(
+    key: string,
+    value: unknown,
+    parentId?: NodeId,
+  ): Array<YTreeModel> {
+    return this.collectByParam(key, value, parentId, false);
+  }
+
+  /**
+   * 按属性模糊匹配（对标 zTree getNodesByParamFuzzy），忽略大小写
+   */
+  public getNodesByParamFuzzy(
+    key: string,
+    value: unknown,
+    parentId?: NodeId,
+  ): Array<YTreeModel> {
+    return this.collectByParam(key, value, parentId, true);
+  }
+
+  /**
+   * 节点在兄弟中的下标（对标 zTree getNodeIndex），找不到返回 -1
+   */
+  public getNodeIndex(id: NodeId): number {
+    const node = this.flatNodesMap?.get(id);
+    if (!node) {
+      return -1;
+    }
+    const siblings = this.getSiblingList(node);
+    if (!siblings) {
+      return -1;
+    }
+    return siblings.indexOf(id);
+  }
+
+  /**
+   * 热更新展示字段（对标 zTree updateNode）
+   * 不改 id / pId / childIds / level 等结构字段
+   * checked 走 checkNode；selected 走 selectNode / cancelSelectedNode
+   */
+  public updateNode(
+    id: NodeId,
+    patch: Partial<YTreeModel> | Record<string, unknown> = {},
+  ): boolean {
+    const node = this.flatNodesMap?.get(id);
+    if (!node || !patch) {
+      return false;
+    }
+    const data = patch as Record<string, unknown>;
+    let changed = false;
+
+    const setStr = (field: string) => {
+      if (!(field in data)) {
+        return;
+      }
+      const next = data[field];
+      if (typeof next !== "string") {
+        return;
+      }
+      if ((node as Record<string, unknown>)[field] === next) {
+        return;
+      }
+      (node as Record<string, unknown>)[field] = next;
+      changed = true;
+    };
+    const setBool = (field: string) => {
+      if (!(field in data)) {
+        return;
+      }
+      const next = !!data[field];
+      if ((node as Record<string, unknown>)[field] === next) {
+        return;
+      }
+      (node as Record<string, unknown>)[field] = next;
+      changed = true;
+    };
+
+    setStr("name");
+    setStr("title");
+    setStr("icon");
+    setStr("iconOpen");
+    setStr("iconClose");
+    setStr("iconSkin");
+    setBool("disabled");
+    setBool("hide");
+    setBool("nocheck");
+    setBool("checkboxDisabled");
+
+    if ("checked" in data) {
+      if (this.checkNode(id, !!data["checked"])) {
+        changed = true;
+      }
+    }
+    if ("selected" in data) {
+      const ok = data["selected"]
+        ? this.selectNode(id, true)
+        : this.cancelSelectedNode(id);
+      if (ok) {
+        changed = true;
+      }
+    }
+
+    return changed;
+  }
+
+  /**
+   * 当前树 DFS 扁平列表（对标 zTree transformToArray）
+   */
+  public transformToArray(parentId?: NodeId): Array<YTreeModel> {
+    const list: Array<YTreeModel> = [];
+    if (!this.flatNodesMap) {
+      return list;
+    }
+    const roots =
+      parentId === undefined
+        ? this.rootIds
+        : this.flatNodesMap.get(parentId)
+        ? [parentId]
+        : [];
+    const stack: Array<NodeId> = [...roots].reverse();
+    while (stack.length) {
+      const id = stack.pop() as NodeId;
+      const node = this.flatNodesMap.get(id);
+      if (!node) {
+        continue;
+      }
+      list.push(node);
+      for (let i = node.childIds.length - 1; i >= 0; i--) {
+        stack.push(node.childIds[i]);
+      }
+    }
+    return list;
+  }
+
+  /**
+   * 当前树还原为嵌套结构（对标 zTree transformTozTreeNodes）
+   */
+  public transformTozTreeNodes(parentId?: NodeId): Array<YTreeNode> {
+    const build = (ids: Array<NodeId>): Array<YTreeNode> => {
+      const result: Array<YTreeNode> = [];
+      for (const id of ids) {
+        const node = this.flatNodesMap?.get(id);
+        if (!node) {
+          continue;
+        }
+        result.push({
+          ...(node as unknown as YTreeNode),
+          children: build(node.childIds),
+        });
+      }
+      return result;
+    };
+    if (parentId === undefined) {
+      return build(this.rootIds);
+    }
+    const parent = this.flatNodesMap?.get(parentId);
+    if (!parent) {
+      return [];
+    }
+    return build(parent.childIds);
+  }
+
+  /**
+   * 纯函数：id/pId 扁数据 → 嵌套（不碰当前树）
+   */
+  public transformTozTreeNodesFromFlat(
+    nodes: Array<YTreeFlatNode>,
+  ): Array<YTreeNode> {
+    const list = Array.isArray(nodes) ? nodes : [];
+    const childrenMap = new Map<NodeId, Array<YTreeFlatNode>>();
+    const roots: Array<YTreeFlatNode> = [];
+    const sourceMap = new Map<NodeId, YTreeFlatNode>();
+    for (const node of list) {
+      if (!node || node.id === undefined || node.id === null) {
+        continue;
+      }
+      sourceMap.set(node.id, node);
+    }
+    for (const node of list) {
+      if (!node || node.id === undefined || node.id === null) {
+        continue;
+      }
+      const pId = this.resolveFlatNodeParentId(node, sourceMap);
+      if (pId === this.ROOT_PARENT_ID) {
+        roots.push(node);
+        continue;
+      }
+      const childs = childrenMap.get(pId);
+      if (childs) {
+        childs.push(node);
+      } else {
+        childrenMap.set(pId, [node]);
+      }
+    }
+    const build = (items: Array<YTreeFlatNode>): Array<YTreeNode> => {
+      return items.map((item) => ({
+        ...(item as unknown as YTreeNode),
+        children: build(childrenMap.get(item.id) ?? []),
+      }));
+    };
+    return build(roots);
+  }
+
+  /**
+   * 按属性收集节点
+   */
+  private collectByParam(
+    key: string,
+    value: unknown,
+    parentId: NodeId | undefined,
+    fuzzy: boolean,
+  ): Array<YTreeModel> {
+    const list: Array<YTreeModel> = [];
+    if (!this.flatNodesMap || !key) {
+      return list;
+    }
+    const needle = fuzzy ? String(value ?? "").toLowerCase() : value;
+    const match = (node: YTreeModel): boolean => {
+      const actual = (node as Record<string, unknown>)[key];
+      if (fuzzy) {
+        return String(actual ?? "").toLowerCase().indexOf(needle as string) >= 0;
+      }
+      return actual === value;
+    };
+    if (parentId === undefined) {
+      this.flatNodesMap.forEach((node) => {
+        if (match(node)) {
+          list.push(node);
+        }
+      });
+      return list;
+    }
+    const root = this.flatNodesMap.get(parentId);
+    if (!root) {
+      return list;
+    }
+    const stack: Array<NodeId> = [parentId];
+    const visited = new Set<NodeId>();
+    while (stack.length) {
+      const id = stack.pop() as NodeId;
+      if (visited.has(id)) {
+        continue;
+      }
+      visited.add(id);
+      const node = this.flatNodesMap.get(id);
+      if (!node) {
+        continue;
+      }
+      if (match(node)) {
+        list.push(node);
+      }
+      for (let i = node.childIds.length - 1; i >= 0; i--) {
+        stack.push(node.childIds[i]);
+      }
+    }
+    return list;
+  }
+
+  /**
    * 用户行为触发节点勾选切换
    * @param {NodeId} id 节点id
    * @param {boolean} linkage 是否联动子节点
@@ -683,6 +1058,7 @@ export class YTreeService {
       this.nodeCheckedStateMap?.delete(rid);
       this.childStateCountMap?.delete(rid);
       this.checkIds?.delete(rid);
+      this.selectedIds?.delete(rid);
     }
     this.rebuildLevelMap();
 
@@ -1363,9 +1739,7 @@ export class YTreeService {
           (targetNode.childIds || []).length > 0
         ) {
           const oldState = this.getNodeCheckedState(targetNode.id);
-          const newState: YTreeCheckedState = checked
-            ? "checked"
-            : "unchecked";
+          const newState: YTreeCheckedState = checked ? "checked" : "unchecked";
           this.applyStateToNode(targetNode, newState);
           if (affectParent && oldState !== newState) {
             this.propagateCheckedState(targetNode.id, oldState, newState);

@@ -31,6 +31,12 @@ export interface YTreeChkboxType {
 }
 
 /**
+ * 展开动画速度（对标 zTree expandSpeed）
+ * 数字 = 毫秒；fast=200；slow=400；false / "" / 0 = 关闭动画
+ */
+export type YTreeExpandSpeed = number | false | "" | "fast" | "slow";
+
+/**
  * 整树勾选汇总
  */
 export interface YTreeCheckedSummary {
@@ -123,6 +129,14 @@ export interface YTreeModel extends YTreeFlatNode {
 }
 
 /**
+ * 节点标题字体样式（对标 zTree fontCss）
+ * 对象则整树共用；函数则按节点返回（返回空表示不覆盖）
+ */
+export type YTreeFontCss =
+  | Record<string, string>
+  | ((node: YTreeModel) => Record<string, string> | null | undefined);
+
+/**
  * 节点通用数据模型
  */
 interface YTreeBaseNode {
@@ -176,6 +190,26 @@ interface YTreeBaseNode {
    * @type {boolean}
    */
   isParent?: boolean;
+  /**
+   * 自定义节点图标（CSS class 或图片 URL，对标 zTree icon）
+   */
+  icon?: string;
+  /**
+   * 父节点展开时的图标（对标 zTree iconOpen）
+   */
+  iconOpen?: string;
+  /**
+   * 父节点折叠时的图标（对标 zTree iconClose）
+   */
+  iconClose?: string;
+  /**
+   * 图标皮肤名，渲染为 `y-tree-icon-skin-${iconSkin}`（对标 zTree iconSkin）
+   */
+  iconSkin?: string;
+  /**
+   * 鼠标悬停提示，缺省回退为 name（对标 zTree title）
+   */
+  title?: string;
   [key: string]: any;
 }
 

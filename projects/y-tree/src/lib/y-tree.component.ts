@@ -12,6 +12,12 @@ import {
   TemplateRef,
 } from '@angular/core';
 import { YTreeService } from '../common/service';
+import {
+  parseExpandSpeed,
+  resolveFontCss,
+  resolveNodeIcon,
+  resolveNodeTitle,
+} from '../common/view';
 import type {
   NodeId,
   YTreeModel,
@@ -22,6 +28,8 @@ import type {
   YTreeAsyncSuccessEvent,
   YTreeChkboxType,
   YTreeChkStyle,
+  YTreeExpandSpeed,
+  YTreeFontCss,
   YTreeNodeEvent,
   YTreeFlatNode,
   YTreeRadioType,
@@ -192,6 +200,56 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   @Input() height: number = 400;
   /**
+   * 是否显示节点图标（对标 zTree showIcon）
+   */
+  @Input() showIcon: boolean = true;
+  /**
+   * 是否显示悬停 title（对标 zTree showTitle）
+   */
+  @Input() showTitle: boolean = true;
+  /**
+   * 自定义 title
+   */
+  @Input() title?: (node: YTreeModel) => string;
+  /**
+   * 节点标题字体样式（对标 zTree fontCss）
+   */
+  @Input() fontCss?: YTreeFontCss;
+  /**
+   * 双击标题是否展开/折叠（对标 zTree dblClickExpand），默认 true
+   */
+  @Input() dblClickExpand: boolean = true;
+  /**
+   * 展开动画速度（对标 zTree expandSpeed），默认关闭
+   */
+  @Input() expandSpeed: YTreeExpandSpeed = 0;
+  /**
+   * 是否允许多选文本选中（对标 zTree selectedMulti），默认 true
+   */
+  @Input() selectedMulti: boolean = true;
+  /**
+   * 点击前置拦截，返回 false 取消选中与 click
+   */
+  @Input() beforeClick?: (payload: YTreeNodeEvent) => boolean;
+  /**
+   * 展开前置拦截，返回 false 取消
+   */
+  @Input() beforeExpand?: (
+    payload: YTreeNodeEvent & { expand: boolean }
+  ) => boolean;
+  /**
+   * 折叠前置拦截，返回 false 取消
+   */
+  @Input() beforeCollapse?: (
+    payload: YTreeNodeEvent & { expand: boolean }
+  ) => boolean;
+  /**
+   * 勾选前置拦截，返回 false 取消；程序化 checkNode 不走
+   */
+  @Input() beforeCheck?: (
+    payload: YTreeNodeEvent & { checked: boolean }
+  ) => boolean;
+  /**
    * 文本节点点击事件
    */
   @Output() click = new EventEmitter<any>();
@@ -341,6 +399,21 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   private rootLoadStarted: boolean = false;
 
+  /**
+   * 展开动画：刚展开的子孙
+   */
+  protected enteringIds: Set<NodeId> = new Set();
+
+  /**
+   * 展开动画：正在收起但仍需短暂渲染的子孙
+   */
+  protected leaving: { parentId: NodeId; ids: Array<NodeId> } | null = null;
+
+  /**
+   * 展开动画定时器
+   */
+  private expandTimer: ReturnType<typeof setTimeout> | 0 = 0;
+
   constructor(private ref: ChangeDetectorRef) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -450,6 +523,13 @@ export class YTreeComponent implements OnChanges, OnDestroy {
         for (let i = node.childIds.length - 1; i >= 0; i--) {
           stack.push(node.childIds[i]);
         }
+      } else if (this.leaving && this.leaving.parentId === id) {
+        for (const lid of this.leaving.ids) {
+          const child = flatMap.get(lid);
+          if (child && !child.hide) {
+            list.push({ id: lid, node: child });
+          }
+        }
       }
     }
     this.visibleNodes = list;
@@ -491,40 +571,22 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     return this.expandedIds.has(id);
   }
 
+  /** 是否存在多根节点引导主干线（一级节点之间的连线） */
+  protected get hasRootLine(): boolean {
+    return !!this.showLine && (this.service?.getRootIds().length ?? 0) > 1;
+  }
+
   /**
    * 生成折叠切换器（Switcher）引导线背景
-   * 根节点与一级子节点在展开或多节点时产生垂直连接线
+   * 展开状态下从切换器中心（14px）向下画竖线连接子节点
    * @param node 节点信息
    */
   protected switcherBg(node: YTreeModel): string {
-    if (!this.showLine) {
+    if (!this.showLine || !this.isExpanded(node.id)) {
       return 'none';
     }
-    const isExpanded = this.isExpanded(node.id);
-    const isRoot = node.level === 0;
-    const hasTopLine = isRoot && !node.isFirst;
-    const hasBottomLine = isRoot ? !node.isLast || isExpanded : isExpanded;
-
-    if (!hasTopLine && !hasBottomLine) {
-      return 'none';
-    }
-
     const color = '#c0c4cc';
-    const layers: Array<string> = [];
-    if (hasTopLine && hasBottomLine) {
-      layers.push(
-        `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 100% no-repeat`
-      );
-    } else if (hasTopLine) {
-      layers.push(
-        `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 14px no-repeat`
-      );
-    } else if (hasBottomLine) {
-      layers.push(
-        `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 14px / 1px 14px no-repeat`
-      );
-    }
-    return layers.join(', ');
+    return `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 14px / 1px 14px no-repeat`;
   }
 
   /**
@@ -536,43 +598,69 @@ export class YTreeComponent implements OnChanges, OnDestroy {
       return 'none';
     }
     const color = '#c0c4cc';
-    const level = node.level;
     const isLeaf = !this.hasChildren(node.id);
 
-    // 一级节点（根节点）
-    if (level === 0) {
-      if (!isLeaf) {
-        return 'none';
+    if (this.hasRootLine) {
+      const ancestors: Array<YTreeModel> = [];
+      let cur: YTreeModel | null = node;
+      while (cur) {
+        ancestors.unshift(cur);
+        const pId: string | number = cur.pId;
+        cur =
+          pId === undefined || pId === null || pId === ''
+            ? null
+            : this.service?.getNodeById(pId) ?? null;
       }
-      const hasTopLine = !node.isFirst;
-      const hasBottomLine = !node.isLast;
-      const hasHorizLine = !node.isFirst || !node.isLast;
-      if (!hasTopLine && !hasBottomLine && !hasHorizLine) {
-        return 'none';
-      }
+
+      const level = node.level;
       const layers: Array<string> = [];
-      if (hasTopLine && hasBottomLine) {
-        layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 100% no-repeat`
-        );
-      } else if (hasTopLine) {
-        layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 0 / 1px 14px no-repeat`
-        );
-      } else if (hasBottomLine) {
-        layers.push(
-          `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) 8px 14px / 1px 14px no-repeat`
-        );
+
+      for (let col = 0; col <= level; col++) {
+        const x = col * 24 + 8;
+        const isCornerCol = col === level;
+
+        if (isCornerCol) {
+          const startX = col * 24 + 8;
+          const lineLen = isLeaf ? (col + 1) * 24 + 16 - startX : 12;
+          layers.push(
+            `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) ${startX}px 14px / ${lineLen}px 1px no-repeat`
+          );
+
+          const hasTop = col === 0 ? !node.isFirst : true;
+          const hasBottom = !node.isLast;
+
+          if (hasTop && hasBottom) {
+            layers.push(
+              `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`
+            );
+          } else if (hasTop) {
+            layers.push(
+              `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 14px no-repeat`
+            );
+          } else if (hasBottom) {
+            layers.push(
+              `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 14px / 1px 14px no-repeat`
+            );
+          }
+        } else {
+          const ancestor = ancestors[col];
+          if (ancestor && !ancestor.isLast) {
+            layers.push(
+              `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`
+            );
+          }
+        }
       }
-      if (hasHorizLine) {
-        layers.push(
-          `repeating-linear-gradient(to right, transparent 0 3px, ${color} 3px 6px) 8px 14px / 8px 1px no-repeat`
-        );
-      }
-      return layers.join(', ');
+
+      return layers.length > 0 ? layers.join(', ') : 'none';
     }
 
-    // 二级及更深层级节点（level > 0）
+    // 单根节点模式
+    const level = node.level;
+    if (level <= 0) {
+      return 'none';
+    }
+
     const ancestors: Array<YTreeModel> = [];
     let cur: YTreeModel | null = node;
     while (cur) {
@@ -588,14 +676,12 @@ export class YTreeComponent implements OnChanges, OnDestroy {
       const x = i * 24 + 8;
       const isCornerCol = i === level - 1;
       if (isCornerCol) {
-        const continuesDown =
-          !node.isLast || (level === 1 && ancestors[0] && !ancestors[0].isLast);
-        const height = continuesDown ? '100%' : '14px';
+        const height = node.isLast ? '14px' : '100%';
         layers.push(
           `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px ${height} no-repeat`
         );
       } else {
-        const ancestor = ancestors[i];
+        const ancestor = ancestors[i + 1];
         if (ancestor && !ancestor.isLast) {
           layers.push(
             `repeating-linear-gradient(to bottom, transparent 0 3px, ${color} 3px 6px) ${x}px 0 / 1px 100% no-repeat`
@@ -712,7 +798,18 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    * @param id
    */
   protected onClick(event: MouseEvent, id: NodeId) {
-    this.click.emit({ event, id });
+    const payload = { event, id };
+    if (this.beforeClick?.(payload) === false) {
+      event.stopPropagation();
+      return;
+    }
+    const node = this.service?.getNodeById(id);
+    if (node && !node.disabled) {
+      const addFlag = this.selectedMulti && (event.ctrlKey || event.metaKey);
+      this.service?.selectNode(id, addFlag);
+      this.updateView();
+    }
+    this.click.emit(payload);
   }
 
   /**
@@ -722,6 +819,12 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   protected onDbClick(event: MouseEvent, id: NodeId) {
     this.dbClick.emit({ event, id });
+    if (this.editable) {
+      return;
+    }
+    if (this.dblClickExpand && this.hasChildren(id)) {
+      this.onExpandChange(event, id);
+    }
   }
 
   /**
@@ -750,6 +853,14 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   protected onExpandChange(event: MouseEvent, id: NodeId) {
     event.stopPropagation();
     const next = !this.expandedIds.has(id);
+    const payload = { event, id, expand: next };
+    if (next) {
+      if (this.beforeExpand?.(payload) === false) {
+        return;
+      }
+    } else if (this.beforeCollapse?.(payload) === false) {
+      return;
+    }
 
     // 懒加载：首次展开且子节点尚未加载 → 触发异步加载，成功后由 runLazyLoad 展开
     if (next && this.lazy && this.loadData && this.service?.isLazyParent(id)) {
@@ -758,6 +869,28 @@ export class YTreeComponent implements OnChanges, OnDestroy {
         void this.runLazyLoad(node, 'user', false, event);
       }
       return;
+    }
+
+    const expandMs = this.expandMs;
+    if (expandMs > 0) {
+      window.clearTimeout(this.expandTimer);
+      if (next) {
+        const enterIds = this.collectVisibleDescendants(id, this.expandedIds);
+        this.leaving = null;
+        this.enteringIds = new Set(enterIds);
+        this.expandTimer = window.setTimeout(() => {
+          this.enteringIds = new Set();
+          this.ref.markForCheck();
+        }, expandMs);
+      } else {
+        const leaveIds = this.collectVisibleDescendants(id, this.expandedIds);
+        this.enteringIds = new Set();
+        this.leaving = { parentId: id, ids: leaveIds };
+        this.expandTimer = window.setTimeout(() => {
+          this.leaving = null;
+          this.updateView();
+        }, expandMs);
+      }
     }
 
     if (next) {
@@ -776,9 +909,14 @@ export class YTreeComponent implements OnChanges, OnDestroy {
    */
   protected onCheckedChange(event: Event, id: NodeId) {
     const checked = (event.target as HTMLInputElement).checked;
+    const payload = { event: event as MouseEvent, id, checked };
+    if (this.beforeCheck?.(payload) === false) {
+      (event.target as HTMLInputElement).checked = !checked;
+      return;
+    }
     const ok = this.service?.setCheckedByUser(id, checked, !this.checkStrictly);
     if (ok) {
-      this.checkedChange.emit({ event: event as MouseEvent, id, checked });
+      this.checkedChange.emit(payload);
       this.updateView();
     }
   }
@@ -1165,6 +1303,184 @@ export class YTreeComponent implements OnChanges, OnDestroy {
   }
 
   /**
+   * 选中节点文本区（addFlag=true 追加）
+   */
+  public selectNode(id: NodeId, addFlag: boolean = false): boolean {
+    const ok = this.service?.selectNode(id, addFlag) ?? false;
+    if (ok) this.updateView();
+    return ok;
+  }
+
+  /**
+   * 取消文本区选中，缺省清空全部
+   */
+  public cancelSelectedNode(id?: NodeId): boolean {
+    const ok = this.service?.cancelSelectedNode(id) ?? false;
+    if (ok) this.updateView();
+    return ok;
+  }
+
+  /**
+   * 当前文本区选中节点
+   */
+  public getSelectedNodes(): Array<YTreeModel> {
+    return this.service?.getSelectedNodes() ?? [];
+  }
+
+  /** 根节点列表 */
+  public getNodes(): Array<YTreeModel> {
+    return this.service?.getNodes() ?? [];
+  }
+
+  /** 按属性精确匹配 */
+  public getNodesByParam(
+    key: string,
+    value: unknown,
+    parentId?: NodeId
+  ): Array<YTreeModel> {
+    return this.service?.getNodesByParam(key, value, parentId) ?? [];
+  }
+
+  /** 按属性模糊匹配（忽略大小写） */
+  public getNodesByParamFuzzy(
+    key: string,
+    value: unknown,
+    parentId?: NodeId
+  ): Array<YTreeModel> {
+    return this.service?.getNodesByParamFuzzy(key, value, parentId) ?? [];
+  }
+
+  /** 兄弟下标，找不到返回 -1 */
+  public getNodeIndex(id: NodeId): number {
+    return this.service?.getNodeIndex(id) ?? -1;
+  }
+
+  /** 热更新展示字段；checked/selected 走既有状态机 */
+  public updateNode(
+    id: NodeId,
+    patch?: Partial<YTreeModel> | Record<string, unknown>
+  ): boolean {
+    const ok = this.service?.updateNode(id, patch) ?? false;
+    if (ok) this.updateView();
+    return ok;
+  }
+
+  /** 当前树 DFS 扁平列表 */
+  public transformToArray(parentId?: NodeId): Array<YTreeModel> {
+    return this.service?.transformToArray(parentId) ?? [];
+  }
+
+  /** 当前树还原嵌套 */
+  public transformTozTreeNodes(parentId?: NodeId): Array<YTreeNode> {
+    return this.service?.transformTozTreeNodes(parentId) ?? [];
+  }
+
+  /** 扁数据 id/pId → 嵌套（不碰当前树） */
+  public transformTozTreeNodesFromFlat(
+    nodes: Array<YTreeFlatNode>
+  ): Array<YTreeNode> {
+    return this.service?.transformTozTreeNodesFromFlat(nodes) ?? [];
+  }
+
+  /**
+   * 精确展开/折叠；expand 缺省=切换；sonSign 递归子孙
+   */
+  public expandNode(id: NodeId, expand?: boolean, sonSign?: boolean): boolean {
+    const node = this.service?.getNodeById(id);
+    if (!this.service || !node) {
+      return false;
+    }
+    const next = expand === undefined ? !this.expandedIds.has(id) : expand;
+    const payload = {
+      event: undefined as unknown as MouseEvent,
+      id,
+      expand: next,
+    };
+    if (next) {
+      if (this.beforeExpand?.(payload) === false) {
+        return false;
+      }
+    } else if (this.beforeCollapse?.(payload) === false) {
+      return false;
+    }
+
+    const ids: Array<NodeId> = [id];
+    if (sonSign) {
+      const flatMap = this.service.getFlatNodesMap();
+      const stack = [...node.childIds];
+      while (stack.length) {
+        const cid = stack.pop() as NodeId;
+        const child = flatMap?.get(cid);
+        if (!child) {
+          continue;
+        }
+        if (child.childIds.length > 0 || this.service.hasChildren(cid)) {
+          ids.push(cid);
+        }
+        stack.push(...child.childIds);
+      }
+    }
+
+    if (next && this.lazy && this.loadData) {
+      for (const nid of ids) {
+        if (this.service.isLazyParent(nid)) {
+          const lazyNode = this.service.getNodeById(nid);
+          if (lazyNode && !lazyNode.isAjaxing) {
+            void this.runLazyLoad(lazyNode, 'api');
+          }
+        }
+      }
+    }
+
+    for (const nid of ids) {
+      if (next) {
+        this.expandedIds.add(nid);
+      } else {
+        this.expandedIds.delete(nid);
+      }
+    }
+    this.expandChange.emit(payload);
+    this.updateView();
+    return true;
+  }
+
+  /**
+   * 沿祖先链展开/收起，使目标可见
+   */
+  public expandCollapseParentNode(id: NodeId, expand: boolean): boolean {
+    const node = this.service?.getNodeById(id);
+    if (!this.service || !node) {
+      return false;
+    }
+    const ancestors: Array<NodeId> = [];
+    let cur = node;
+    while (cur) {
+      const pId = cur.pId;
+      if (pId === undefined || pId === null || pId === '') {
+        break;
+      }
+      const parent = this.service.getNodeById(pId);
+      if (!parent) {
+        break;
+      }
+      ancestors.push(parent.id);
+      cur = parent;
+    }
+    if (ancestors.length === 0) {
+      return false;
+    }
+    for (const nid of ancestors) {
+      if (expand) {
+        this.expandedIds.add(nid);
+      } else {
+        this.expandedIds.delete(nid);
+      }
+    }
+    this.updateView();
+    return true;
+  }
+
+  /**
    * 程序化移动节点
    */
   public moveNode(
@@ -1190,7 +1506,82 @@ export class YTreeComponent implements OnChanges, OnDestroy {
     return newId;
   }
 
+  /** 展开动画时长（毫秒），0 表示关闭 */
+  protected get expandMs(): number {
+    return parseExpandSpeed(this.expandSpeed);
+  }
+
+  /**
+   * 解析节点图标
+   */
+  protected nodeIcon(
+    node: YTreeModel,
+    isExpanded: boolean,
+    hasChildren: boolean
+  ): { type: string; src?: string; className?: string } {
+    return resolveNodeIcon(node, isExpanded, hasChildren, this.showIcon);
+  }
+
+  /**
+   * 解析悬停 title
+   */
+  protected nodeTitle(node: YTreeModel): string {
+    return resolveNodeTitle(node, this.showTitle, this.title);
+  }
+
+  /**
+   * 解析节点字体样式
+   */
+  protected nodeFontCss(node: YTreeModel): Record<string, string> {
+    return resolveFontCss(node, this.fontCss);
+  }
+
+  /**
+   * 是否处于展开进入动画
+   */
+  protected isEntering(id: NodeId): boolean {
+    return this.enteringIds.has(id);
+  }
+
+  /**
+   * 是否处于收起离开动画
+   */
+  protected isLeaving(id: NodeId): boolean {
+    return !!this.leaving && this.leaving.ids.indexOf(id) >= 0;
+  }
+
+  /**
+   * 收集当前可见的子孙节点（展开动画进入/离开用）
+   */
+  private collectVisibleDescendants(
+    parentId: NodeId,
+    expandedSet: Set<NodeId>
+  ): Array<NodeId> {
+    const ids: Array<NodeId> = [];
+    const flatMap = this.service?.getFlatNodesMap();
+    const parent = flatMap?.get(parentId);
+    if (!flatMap || !parent) {
+      return ids;
+    }
+    const stack: Array<NodeId> = [...parent.childIds].reverse();
+    while (stack.length) {
+      const cid = stack.pop() as NodeId;
+      const child = flatMap.get(cid);
+      if (!child || child.hide) {
+        continue;
+      }
+      ids.push(cid);
+      if (child.childIds.length > 0 && expandedSet.has(cid)) {
+        for (let i = child.childIds.length - 1; i >= 0; i--) {
+          stack.push(child.childIds[i]);
+        }
+      }
+    }
+    return ids;
+  }
+
   ngOnDestroy(): void {
+    window.clearTimeout(this.expandTimer);
     this.service?.destroyed();
     this.service = null;
   }
