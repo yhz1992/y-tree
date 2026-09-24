@@ -1,0 +1,12 @@
+{
+	"extends": "./tsconfig.app.json",
+	"compilerOptions": {
+		"composite": false,
+		"rootDir": "..",
+		"noEmit": false,
+		"declaration": true,
+		"emitDeclarationOnly": true,
+		"outDir": "dist"
+	},
+	"include": ["src/components/y-tree/**/*", "src/components/y-tree/**/*.vue", "../common/**/*"]
+}

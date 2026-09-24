@@ -1,0 +1,45 @@
+{
+  "name": "y-tree-react",
+  "version": "0.1.0",
+  "description": "y-tree 树组件（React 版）",
+  "type": "module",
+  "main": "./dist/y-tree-react.cjs",
+  "module": "./dist/y-tree-react.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/y-tree-react.mjs",
+      "require": "./dist/y-tree-react.cjs"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:lib": "vite build -c vite.config.lib.ts",
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build:lib"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^18.14.2",
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "@vitejs/plugin-react": "^3.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "~4.8.4",
+    "vite": "^4.1.4",
+    "vite-plugin-dts": "^3.9.1"
+  }
+}

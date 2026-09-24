@@ -1,0 +1,395 @@
+body {
+	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+		sans-serif;
+	background: #f5f6f8;
+	color: #1f2329;
+}
+
+/* ---------- 整体布局：左侧菜单 + 右侧内容 ---------- */
+.demo-layout {
+	display: flex;
+	align-items: flex-start;
+}
+
+.demo-sidebar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 20;
+	width: 220px;
+	height: 100vh;
+	overflow-y: auto;
+	background: #fff;
+	border-right: 1px solid #eaecef;
+	padding: 20px 0 40px;
+	box-sizing: border-box;
+}
+
+.demo-sidebar-title {
+	font-size: 18px;
+	font-weight: 600;
+	padding: 0 20px 16px;
+	letter-spacing: 0.5px;
+	display: flex;
+	align-items: center;
+}
+
+.demo-sidebar-toggle,
+.demo-sidebar-mask,
+.demo-sidebar-close {
+	display: none;
+}
+
+.demo-sidebar-sub {
+	font-size: 12px;
+	font-weight: 400;
+	color: #8a919f;
+	margin-left: 6px;
+}
+
+.demo-sidebar-group {
+	margin-bottom: 6px;
+}
+
+.demo-sidebar-group-title {
+	font-size: 12px;
+	color: #8a919f;
+	padding: 10px 20px 4px;
+	letter-spacing: 0.4px;
+}
+
+.demo-sidebar-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.demo-sidebar-link {
+	display: block;
+	width: 100%;
+	text-align: left;
+	border: none;
+	background: none;
+	font-size: 13px;
+	color: #4e5969;
+	padding: 7px 20px;
+	cursor: pointer;
+	border-right: 2px solid transparent;
+	font-family: inherit;
+	transition: color 0.15s, background 0.15s;
+}
+
+.demo-sidebar-link:hover {
+	color: #1677ff;
+	background: #f7f9fc;
+}
+
+.demo-sidebar-link.is-active {
+	color: #1677ff;
+	background: #f0f6ff;
+	border-right-color: #1677ff;
+	font-weight: 500;
+}
+
+.demo-main {
+	margin-left: 220px;
+	flex: 1;
+	min-width: 0;
+	padding: 28px 40px 80px;
+	max-width: 920px;
+	box-sizing: border-box;
+}
+
+.demo-header h1 {
+	font-size: 24px;
+	margin: 0 0 6px;
+}
+
+.demo-header p {
+	font-size: 13px;
+	color: #8a919f;
+	margin: 0 0 24px;
+	line-height: 1.7;
+}
+
+/* ---------- 功能点卡片 ---------- */
+.demo-card {
+	background: #fff;
+	border-radius: 8px;
+	padding: 20px;
+	margin-bottom: 20px;
+	scroll-margin-top: 24px;
+}
+
+.demo-card-title {
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 6px;
+}
+
+.demo-card-desc {
+	font-size: 13px;
+	color: #8a919f;
+	margin: 0 0 14px;
+	line-height: 1.7;
+}
+
+.demo-card-body {
+	border: 1px solid #eaecef;
+	border-radius: 6px;
+	padding: 16px;
+}
+
+.demo-card-code-bar {
+	margin-top: 10px;
+}
+
+.demo-card-code-btn {
+	border: none;
+	background: none;
+	color: #1677ff;
+	font-size: 12px;
+	cursor: pointer;
+	padding: 4px 0;
+	font-family: inherit;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.demo-card-code-caret {
+	display: inline-block;
+	transition: transform 0.15s;
+	font-size: 10px;
+}
+
+.demo-card-code-caret.is-open {
+	transform: rotate(90deg);
+}
+
+.demo-card-code {
+	margin: 6px 0 0;
+	background: #f7f8fa;
+	border-radius: 6px;
+	padding: 14px;
+	font-size: 12px;
+	line-height: 1.7;
+	overflow-x: auto;
+	font-family: 'SF Mono', Menlo, Consolas, monospace;
+	color: #334155;
+}
+
+/* ---------- demo 内的通用元素 ---------- */
+.demo-tip {
+	font-size: 12px;
+	color: #8a919f;
+	margin: 10px 0 0;
+	line-height: 1.6;
+}
+
+.demo-log {
+	font-size: 11px;
+	background: #f7f8fa;
+	padding: 8px 10px;
+	margin: 10px 0 0;
+	max-height: 84px;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-all;
+	border-radius: 4px;
+	font-family: 'SF Mono', Menlo, Consolas, monospace;
+	color: #4e5969;
+}
+
+.demo-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.demo-toolbar button,
+.demo-actions button {
+	font-size: 12px;
+	padding: 5px 12px;
+	border: 1px solid #d9dde3;
+	background: #fff;
+	border-radius: 4px;
+	cursor: pointer;
+	font-family: inherit;
+	color: #4e5969;
+	transition: border-color 0.15s, color 0.15s;
+}
+
+.demo-toolbar button:hover,
+.demo-actions button:hover {
+	border-color: #1677ff;
+	color: #1677ff;
+}
+
+.demo-input {
+	font-size: 12px;
+	padding: 5px 10px;
+	border: 1px solid #d9dde3;
+	border-radius: 4px;
+	font-family: inherit;
+	color: #4e5969;
+	outline: none;
+	min-width: 200px;
+}
+
+.demo-input:focus {
+	border-color: #1677ff;
+}
+
+.demo-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 12px;
+	color: #4e5969;
+	cursor: pointer;
+	user-select: none;
+}
+
+.demo-node-tag {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 0 6px;
+	font-size: 11px;
+	line-height: 17px;
+	color: #1677ff;
+	background: #f0f6ff;
+	border-radius: 3px;
+}
+
+.demo-row {
+	display: flex;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.demo-col {
+	flex: 1;
+	min-width: 180px;
+}
+
+.demo-col-label {
+	font-size: 12px;
+	color: #8a919f;
+	margin-bottom: 6px;
+	font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.demo-api-note {
+	font-size: 12px;
+	color: #8a919f;
+	margin: 0 0 12px;
+	line-height: 1.7;
+}
+
+.demo-api-wrap {
+	overflow-x: auto;
+}
+
+.demo-api-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+}
+
+.demo-api-table th,
+.demo-api-table td {
+	text-align: left;
+	padding: 8px 10px;
+	border-bottom: 1px solid #eaecef;
+	vertical-align: top;
+}
+
+.demo-api-table th {
+	color: #8a919f;
+	font-weight: 500;
+	background: #f7f8fa;
+}
+
+.demo-api-table code {
+	font-family: 'SF Mono', Menlo, Consolas, monospace;
+	font-size: 11px;
+	color: #1677ff;
+}
+
+@media (max-width: 900px) {
+	.demo-sidebar-toggle {
+		display: inline-flex;
+		align-items: center;
+		position: fixed;
+		top: 12px;
+		left: 12px;
+		z-index: 40;
+		height: 32px;
+		padding: 0 12px;
+		border: 1px solid #eaecef;
+		border-radius: 6px;
+		background: #fff;
+		color: #1f2329;
+		font-size: 13px;
+		font-family: inherit;
+		cursor: pointer;
+		box-shadow: 0 1px 4px rgba(31, 35, 41, 0.08);
+	}
+
+	.demo-sidebar-mask {
+		display: none;
+		position: fixed;
+		inset: 0;
+		z-index: 45;
+		border: none;
+		padding: 0;
+		background: rgba(31, 35, 41, 0.35);
+		cursor: pointer;
+	}
+
+	.demo-nav {
+		--demo-drawer-x: -220px;
+	}
+
+	.demo-nav.is-open {
+		--demo-drawer-x: 0px;
+	}
+
+	.demo-nav.is-open .demo-sidebar-mask {
+		display: block;
+	}
+
+	.demo-sidebar-close {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		margin-left: auto;
+		width: 28px;
+		height: 28px;
+		border: none;
+		background: none;
+		color: #8a919f;
+		font-size: 22px;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.demo-nav .demo-sidebar {
+		z-index: 50;
+		left: var(--demo-drawer-x, -220px);
+		box-shadow: none;
+		transition: left 0.2s ease;
+	}
+
+	.demo-nav.is-open .demo-sidebar {
+		box-shadow: 4px 0 24px rgba(31, 35, 41, 0.12);
+	}
+
+	.demo-main {
+		margin-left: 0;
+		padding: 56px 16px 60px;
+	}
+}

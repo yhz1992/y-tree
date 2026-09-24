@@ -1,0 +1,386 @@
+/* y-tree 组件共享基础样式（三个框架共用：Angular / React / Vue）
+ * 唯一权威来源：common/style/base.css
+ * 修改此处后需同步：angular/projects/y-tree/src/common/style/base.css（ng-packagr 限制库内引用）
+ */
+.y-tree {
+  position: relative;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+  user-select: none;
+}
+
+.y-tree-small {
+  font-size: 12px;
+}
+
+.y-tree-large {
+  font-size: 16px;
+}
+
+.y-tree-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding-right: 8px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.y-tree-node.is-selected > .y-tree-title {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.y-tree-node.is-disabled {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+.y-tree-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 28px;
+  margin-right: 4px;
+  color: rgba(0, 0, 0, 0.45);
+  transition: color 0.2s;
+  box-sizing: border-box;
+  flex: none;
+}
+
+.y-tree-switcher.has-children {
+  cursor: pointer;
+}
+
+.y-tree-switcher-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 12px;
+  background: #fff;
+  border-radius: 2px;
+}
+
+.y-tree-switcher.has-children:hover .y-tree-switcher-icon {
+  color: #1677ff;
+}
+
+/* 懒加载：子节点异步加载中（旋转 loading，替代展开箭头） */
+.y-tree-switcher-icon.is-ajaxing {
+  color: #1677ff;
+  animation: y-tree-ajaxing-spin 1s linear infinite;
+}
+
+@keyframes y-tree-ajaxing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.y-tree-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  cursor: pointer;
+}
+
+.y-tree-checkbox-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.y-tree-checkbox-icon {
+  font-size: 16px;
+  color: rgba(0, 0, 0, 0.45);
+  transition: color 0.2s;
+}
+
+.y-tree-checkbox:hover .y-tree-checkbox-icon {
+  color: #1677ff;
+}
+
+.y-tree-checkbox-icon.fa-square-check,
+.y-tree-checkbox-icon.fa-circle-dot {
+  color: #1677ff;
+}
+
+.y-tree-node.is-disabled .y-tree-checkbox-icon {
+  color: rgba(0, 0, 0, 0.2);
+  cursor: not-allowed;
+}
+
+.y-tree-node-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  font-size: 14px;
+  color: #f5a623;
+  flex: none;
+}
+
+.y-tree-node-icon.is-leaf {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.y-tree-node-icon-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.y-tree-icon-skin-p5.is-open,
+.y-tree-icon-skin-p5.is-close {
+  color: #1677ff;
+}
+
+.y-tree-icon-skin-p5.is-docu {
+  color: #52c41a;
+}
+
+.y-tree-node.is-expand-enter {
+  animation: y-tree-expand-in var(--y-tree-expand-speed, 200ms) ease-out;
+}
+
+.y-tree-node.is-expand-leave {
+  animation: y-tree-expand-out var(--y-tree-expand-speed, 200ms) ease-in
+    forwards;
+}
+
+@keyframes y-tree-expand-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes y-tree-expand-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.y-tree-title {
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.y-tree-title:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+}
+
+.y-tree-virtual-spacer {
+  width: 100%;
+}
+
+.y-tree-virtual-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.y-tree-indent {
+  display: inline-block;
+  flex: none;
+  height: 28px;
+  vertical-align: top;
+}
+
+.y-tree-indent-leaf {
+  margin-right: 6px;
+}
+
+/* 拖拽：源节点半透明 */
+.y-tree-node.is-dragging {
+  opacity: 0.4;
+}
+
+/* 拖拽：插入目标之前（顶部指示线） */
+.y-tree-node.is-drop-before::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: #1677ff;
+  z-index: 1;
+}
+
+/* 拖拽：插入目标之后（底部指示线） */
+.y-tree-node.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #1677ff;
+  z-index: 1;
+}
+
+/* 拖拽：成为目标子节点（整行高亮） */
+.y-tree-node.is-drop-inner {
+  background-color: rgba(22, 119, 255, 0.12);
+  box-shadow: inset 0 0 0 1px #1677ff;
+}
+
+/* 编辑：行内重命名输入框（替换标题显示） */
+.y-tree-edit-input {
+  height: 24px;
+  padding: 0 6px;
+  font-size: inherit;
+  line-height: 24px;
+  color: inherit;
+  background: #fff;
+  border: 1px solid #1677ff;
+  border-radius: 4px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* 编辑：操作按钮组 + 删除确认气泡 的定位容器（跟随文本节点，气泡相对此容器定位） */
+.y-tree-actions-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+/* 编辑：hover 操作按钮组 */
+.y-tree-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.y-tree-node:hover .y-tree-actions {
+  opacity: 1;
+}
+
+.y-tree-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.y-tree-action-btn:hover {
+  color: #1677ff;
+  background-color: rgba(22, 119, 255, 0.08);
+}
+
+.y-tree-action-btn.is-danger:hover {
+  color: #ff4d4f;
+  background-color: rgba(255, 77, 79, 0.08);
+}
+
+/* 编辑：删除确认气泡（相对 actions-wrap 定位，左边缘贴删除按钮右缘，随行滚动不错位） */
+.y-tree-remove-confirm {
+  position: absolute;
+  /* left:100% = wrap 右缘 = 删除按钮右缘，气泡在删除按钮右侧、左边缘紧贴 */
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* 左侧三角：外层描边三角（尖端朝右，指向删除按钮方向） */
+.y-tree-remove-confirm::before,
+.y-tree-remove-confirm::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+.y-tree-remove-confirm::before {
+  left: -6px;
+  border-right: 6px solid #e5e6eb;
+}
+
+/* 左侧三角：内层白色三角，形成描边效果 */
+.y-tree-remove-confirm::after {
+  left: -5px;
+  border-right: 5px solid #fff;
+}
+
+.y-tree-remove-confirm-text {
+  font-size: 12px;
+  color: #333;
+}
+
+.y-tree-remove-confirm-btn,
+.y-tree-remove-cancel-btn {
+  height: 20px;
+  padding: 0 8px;
+  font-size: 12px;
+  line-height: 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.y-tree-remove-confirm-btn {
+  color: #fff;
+  background: #ff4d4f;
+}
+
+.y-tree-remove-confirm-btn:hover {
+  background: #ff7875;
+}
+
+.y-tree-remove-cancel-btn {
+  color: #333;
+  background: #f5f5f5;
+}
+
+.y-tree-remove-cancel-btn:hover {
+  background: #e5e6eb;
+}
