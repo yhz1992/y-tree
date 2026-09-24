@@ -949,8 +949,61 @@ this.tree.expandCollapseParentNode("1-1", true);`,
 ];
 
 /* ================================================================== */
+/* API 参考                                                           */
+/* ================================================================== */
+
+const docsDemos: Array<DemoMeta> = [
+  {
+    id: 'api-props',
+    title: 'Props',
+    desc: '组件入参。before* 拦截回调也列在这里；空数组受控集合表示「未受控」，会回退数据源内联状态。',
+    code: `<y-tree
+  [datasource]="data"
+  [checkable]="true"
+  [showLine]="true"
+  [expandAll]="true"
+  [height]="196"
+></y-tree>`,
+  },
+  {
+    id: 'api-events',
+    title: 'Events',
+    desc: 'Angular 用 (event) 绑定。通用 payload 含 event、id；拖拽/编辑/异步事件另有扩展字段。',
+    code: `<y-tree
+  [datasource]="data"
+  (click)="onClick($event)"
+  (checkedChange)="onCheckedChange($event)"
+  (expandChange)="onExpandChange($event)"
+></y-tree>`,
+  },
+  {
+    id: 'api-methods',
+    title: 'Methods',
+    desc: '通过 ViewChild 调用。checkNode / moveNode / copyNode 等不走 before*；expandNode 走 beforeExpand / beforeCollapse。',
+    code: `@ViewChild(YTreeComponent) tree!: YTreeComponent;
+
+this.tree.checkNode("1-1", true);
+this.tree.getCheckedList();
+this.tree.expandNode("1", true);`,
+  },
+  {
+    id: 'api-node-model',
+    title: 'NodeModel',
+    desc: '入参是 YTreeNode（嵌套 children）或 YTreeFlatNode（pId）。getNodeById 等返回运行时 YTreeModel。',
+    code: `/** 入参（嵌套） */
+{ id: "1", name: "节点 1", children: [{ id: "1-1", name: "节点 1-1", children: [] }] }
+
+/** 入参（扁平） */
+{ id: "1-1", name: "节点 1-1", pId: "1" }
+
+/** 运行时 YTreeModel 另含 childIds / level / halfChecked 等 */`,
+  },
+];
+
+/* ================================================================== */
 
 export const demoGroups: Array<DemoGroup> = [
+  { id: 'group-api-docs', title: 'API 参考', demos: docsDemos },
   { id: 'group-basic', title: '基础', demos: basicDemos },
   { id: 'group-state', title: '节点状态', demos: stateDemos },
   { id: 'group-interaction', title: '数据与交互', demos: interactionDemos },

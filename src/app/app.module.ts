@@ -8,6 +8,7 @@ import { YTreeModule } from 'y-tree';
 
 import { DemoCardComponent } from './demo/demo-card.component';
 import { SidebarComponent } from './demo/sidebar.component';
+import { DocsGroupComponent } from './demo/groups/docs-group.component';
 import { BasicGroupComponent } from './demo/groups/basic-group.component';
 import { StateGroupComponent } from './demo/groups/state-group.component';
 import { InteractionGroupComponent } from './demo/groups/interaction-group.component';
@@ -24,6 +25,7 @@ import { PerfGroupComponent } from './demo/groups/perf-group.component';
     AppComponent,
     DemoCardComponent,
     SidebarComponent,
+    DocsGroupComponent,
     BasicGroupComponent,
     StateGroupComponent,
     InteractionGroupComponent,
