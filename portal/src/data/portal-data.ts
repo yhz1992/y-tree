@@ -11,6 +11,15 @@ export interface FrameworkItem {
   iconBg: string;
 }
 
+/**
+ * demo 站点地址：开发时指向各框架本地 dev server，构建后指向同站点下的子路径
+ */
+function demoUrl(id: FrameworkItem["id"], port: number): string {
+  return import.meta.env.DEV
+    ? `http://localhost:${port}`
+    : `${import.meta.env.BASE_URL}${id}/`;
+}
+
 export const FRAMEWORKS: FrameworkItem[] = [
   {
     id: "react",
@@ -20,7 +29,7 @@ export const FRAMEWORKS: FrameworkItem[] = [
     desc: "JSX 直接接入。勾选、拖拽、搜索和自定义节点都有现成写法。",
     install: "npm i y-tree-react",
     defaultPort: 5174,
-    devUrl: "http://localhost:5174",
+    devUrl: demoUrl("react", 5174),
     accentColor: "#0ea5e9",
     iconBg: "rgba(14, 165, 233, 0.1)",
   },
@@ -32,7 +41,7 @@ export const FRAMEWORKS: FrameworkItem[] = [
     desc: "按 Vue 3 组件来用。支持 v-model，节点内容可用插槽自定义。",
     install: "npm i y-tree-vue",
     defaultPort: 5175,
-    devUrl: "http://localhost:5175",
+    devUrl: demoUrl("vue", 5175),
     accentColor: "#10b981",
     iconBg: "rgba(16, 185, 129, 0.1)",
   },
@@ -44,7 +53,7 @@ export const FRAMEWORKS: FrameworkItem[] = [
     desc: "按 Angular 组件来用。模板插槽可扩展节点内容。",
     install: "npm i y-tree",
     defaultPort: 4200,
-    devUrl: "http://localhost:4200",
+    devUrl: demoUrl("angular", 4200),
     accentColor: "#ef4444",
     iconBg: "rgba(239, 68, 68, 0.1)",
   },

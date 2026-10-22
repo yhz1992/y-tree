@@ -23,7 +23,7 @@ export const Footer: React.FC = () => {
                 rel="noreferrer"
                 className="footer-link"
               >
-                {fw.name} :{fw.defaultPort}
+                {fw.name} 示例
               </a>
             ))}
           </div>

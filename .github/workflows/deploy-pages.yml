@@ -1,0 +1,75 @@
+# 构建门户 + 三框架 demo，合并后部署到 GitHub Pages
+# 站点结构：/y-tree/（门户） /y-tree/react/ /y-tree/vue/ /y-tree/angular/
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  BASE: /${{ github.event.repository.name }}/
+  OUT: ${{ github.workspace }}/_site
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            portal/package-lock.json
+            react/package-lock.json
+            vue/package-lock.json
+            angular/package-lock.json
+
+      - name: Install
+        run: |
+          npm ci --prefix portal
+          npm ci --prefix react
+          npm ci --prefix vue
+          npm ci --prefix angular
+
+      - name: Build portal
+        working-directory: portal
+        run: npx tsc --noEmit -p . && npx vite build --base "$BASE" --outDir "$OUT"
+
+      - name: Build react demo
+        working-directory: react
+        run: npx vite build --base "${BASE}react/" --outDir "$OUT/react"
+
+      - name: Build vue demo
+        working-directory: vue
+        run: npx vite build --base "${BASE}vue/" --outDir "$OUT/vue"
+
+      # demo 经 tsconfig paths 引用 dist/y-tree，需先构建库
+      - name: Build angular demo
+        working-directory: angular
+        run: npm run build:lib && npx ng build demo --base-href "${BASE}angular/" --output-path "$OUT/angular"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

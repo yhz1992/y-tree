@@ -49,7 +49,7 @@ export const Navbar: React.FC = () => {
                 target="_blank"
                 rel="noreferrer"
                 className="fw-capsule-item"
-                title={`打开 ${fw.name} 示例 (:${fw.defaultPort})`}
+                title={`打开 ${fw.name} 示例`}
               >
                 {fw.name}
               </a>
