@@ -70,6 +70,11 @@ export const NeuralTreeCanvas: React.FC<NeuralTreeCanvasProps> = ({
       nodes = [];
       pulses = [];
 
+      // 移动端自动精简层级并向顶部两侧扩散，避免遮挡文字且保持满帧
+      const isMobile = w < 760;
+      const maxDepth = isMobile ? 3 : 4;
+      const stepFactor = isMobile ? 0.14 : 0.075;
+
       const createCluster = (
         originX: number,
         originY: number,
@@ -91,11 +96,10 @@ export const NeuralTreeCanvas: React.FC<NeuralTreeCanvasProps> = ({
         });
 
         let currentLevelIds = [rootId];
-        const maxDepth = 4;
 
         for (let d = 1; d <= maxDepth; d++) {
           const nextLevelIds: number[] = [];
-          const branchCount = d === 1 ? 3 : 2;
+          const branchCount = d === 1 ? (isMobile ? 2 : 3) : 2;
 
           currentLevelIds.forEach((pId, idx) => {
             const parent = nodes[pId];
@@ -106,7 +110,9 @@ export const NeuralTreeCanvas: React.FC<NeuralTreeCanvasProps> = ({
                   (spreadY / Math.pow(d, 0.65)) +
                 (idx - 0.5) * 18;
               const stepX =
-                dirX * (w * (0.075 + Math.random() * 0.035)) * (1.05 - d * 0.1);
+                dirX *
+                (w * (stepFactor + Math.random() * 0.035)) *
+                (1.05 - d * 0.1);
               const bx = parent.baseX + stepX;
               const by =
                 parent.baseY + angleOffset + (Math.random() - 0.5) * 36;
@@ -131,17 +137,32 @@ export const NeuralTreeCanvas: React.FC<NeuralTreeCanvasProps> = ({
       };
 
       // 左右两翼神经树簇，留出中央标题气场区，同时细枝向中心自然延伸
-      createCluster(w * 0.08, h * 0.34, 1, h * 0.42);
-      createCluster(w * 0.92, h * 0.34, -1, h * 0.42);
+      createCluster(
+        isMobile ? w * 0.02 : w * 0.08,
+        isMobile ? h * 0.22 : h * 0.34,
+        1,
+        isMobile ? h * 0.32 : h * 0.42,
+      );
+      createCluster(
+        isMobile ? w * 0.98 : w * 0.92,
+        isMobile ? h * 0.22 : h * 0.34,
+        -1,
+        isMobile ? h * 0.32 : h * 0.42,
+      );
     };
 
     const resize = () => {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
+      const rect = canvas.parentElement?.getBoundingClientRect();
+      width = Math.floor(
+        rect && rect.width > 0
+          ? rect.width
+          : document.documentElement.clientWidth,
+      );
       height = Math.max(860, window.innerHeight * 1.05);
       canvas.width = width * dpr;
       canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
+      canvas.style.width = "100%";
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       buildTopology(width, height);

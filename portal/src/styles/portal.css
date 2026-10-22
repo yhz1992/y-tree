@@ -60,6 +60,14 @@
   padding: 0;
 }
 
+html,
+body {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  position: relative;
+}
+
 html {
   color-scheme: dark;
   scroll-behavior: smooth;
@@ -70,8 +78,13 @@ body {
   background: var(--bg-cosmos);
   color: var(--text-primary);
   line-height: 1.65;
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 button,
@@ -82,17 +95,25 @@ input {
 .portal-root {
   position: relative;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   isolation: isolate;
 }
 
 .portal-main {
   position: relative;
   z-index: 2;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .portal-container {
+  width: 100%;
   max-width: 1240px;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
   padding: 0 36px;
 }
 
@@ -2079,52 +2100,639 @@ input {
 }
 
 /* ============================================================================
- * 12. 响应式适配 (Responsive)
+ * 12. 响应式与移动端专属精致适配 (Responsive & Mobile Experience)
+ *     - 1120px 以下：平板及紧凑桌面适配
+ *     - 760px 以下：手机端专属重构（完全不影响 PC 端视觉）
  * ============================================================================ */
 
 @media (max-width: 1120px) {
+  .portal-container {
+    padding: 0 24px;
+  }
+
   .hero-monolith-title {
     font-size: 52px;
   }
+
   .hairline-grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .hairline-metric-cell:nth-child(2) {
+    border-right: 1px solid var(--hairline);
+  }
+
+  .hairline-metric-cell:nth-child(3) {
+    border-left: 1px solid var(--hairline);
+    border-top: 1px solid var(--hairline);
+  }
+
+  .hairline-metric-cell:nth-child(4) {
+    border-top: 1px solid var(--hairline);
+  }
+
   .nexus-diagram-grid {
     grid-template-columns: 1fr;
     gap: 24px;
   }
+
   .nexus-fiber-bus {
     display: none;
   }
+
   .bento-hairline-matrix,
   .atomic-gallery-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
+
   .bento-span-2 {
-    grid-column: span 1;
+    grid-column: span 2;
   }
 }
 
 @media (max-width: 760px) {
-  .nav-links-row {
+  .portal-container {
+    padding: 0 16px;
+  }
+
+  .section {
+    padding: 72px 0 16px;
+  }
+
+  /* 严控背景光球与溢出：消除一切超出视口边界的发光层 */
+  .cosmos-backdrop {
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  .orb-emerald,
+  .orb-cyan,
+  .orb-fw {
+    width: 240px;
+    height: 240px;
+    left: 10%;
+    right: auto;
+    filter: blur(80px);
+  }
+
+  /* 严控 Grid / Flex 子项最小宽度为 0，彻底消灭横向撑破 */
+  .portal-container,
+  .section,
+  .hero-cinema,
+  .hero-center-stage,
+  .workbench-cinema-wrap,
+  .workbench-monolith-frame,
+  .hairline-grid-4,
+  .hairline-metric-cell,
+  .nexus-holo-stage,
+  .nexus-diagram-grid,
+  .nexus-core-reactor,
+  .nexus-adapters-col,
+  .nexus-adapter-pod,
+  .bento-hairline-matrix,
+  .bento-matrix-cell,
+  .benchmark-cyber-arena,
+  .ide-holo-frame,
+  .atomic-gallery-grid,
+  .atomic-holo-card {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 1. 移动端顶部固定胶囊导航栏 */
+  .floating-nav-dock {
+    position: fixed;
+    top: 8px;
+    left: 0;
+    right: 0;
+    padding: 0 12px;
+    width: 100%;
+  }
+
+  .glass-pill-nav {
+    height: 46px;
+    padding: 0 8px 0 12px;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .nav-links-row,
+  .brand-version-slash {
     display: none;
   }
-  .section {
-    padding: 96px 0 24px;
+
+  .brand-gem-holo {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    flex-shrink: 0;
   }
+
+  .gem-core {
+    font-size: 11px;
+  }
+
+  .brand-text {
+    font-size: 13.5px;
+    white-space: nowrap;
+  }
+
+  .fw-capsule-group {
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .fw-capsule-item {
+    padding: 4px 7px;
+    font-size: 11px;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .fw-logo-mini,
+  .fw-logo-mini svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  /* 2. 移动端首屏巨幕标题与一体化指令舱 */
+  .hero-cinema {
+    padding: 72px 0 36px;
+  }
+
+  .hero-center-stage {
+    margin-bottom: 36px;
+  }
+
+  .hero-ghost-kicker {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 18px;
+  }
+
   .hero-monolith-title {
-    font-size: 36px;
+    font-size: 32px;
+    line-height: 1.16;
+    gap: 4px;
+    margin-bottom: 16px;
   }
-  .hairline-grid-4,
-  .arena-telemetry-readout {
+
+  .hero-monolith-lead {
+    font-size: 14px;
+    line-height: 1.65;
+    margin-bottom: 26px;
+    padding: 0 4px;
+  }
+
+  .hero-monolith-lead br {
+    display: none;
+  }
+
+  .hero-command-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    padding: 10px;
+    gap: 8px;
+    border-radius: 14px;
+  }
+
+  .hero-fw-dock {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    width: 100%;
+  }
+
+  .hero-dock-tab {
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .cli-glass-bar {
+    width: 100%;
+    justify-content: space-between;
+    padding: 9px 10px 9px 14px;
+    font-size: 12px;
+  }
+
+  .btn-cinema-primary {
+    width: 100%;
+    justify-content: center;
+    padding: 11px 16px;
+    font-size: 13.5px;
+  }
+
+  /* 3. 移动端全息工作台（关闭 PC 3D 鼠标倾角，改用触控紧凑流式布局） */
+  .workbench-ambient-glow {
+    inset: -10px 10px -15px;
+    filter: blur(45px);
+  }
+
+  .workbench-monolith-frame {
+    border-radius: 16px;
+    transform: none !important;
+  }
+
+  .workbench-unified-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .wb-left-group {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .wb-left-group .console-window-dots {
+    display: none;
+  }
+
+  .wb-mode-switcher {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .wb-seg-btn {
+    padding: 6px 8px;
+    font-size: 11.5px;
+    text-align: center;
+  }
+
+  .wb-center-search {
+    width: 100%;
+    padding: 7px 12px;
+  }
+
+  .wb-right-controls {
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .wb-divider {
+    display: none;
+  }
+
+  .wb-toggle-pill {
+    font-size: 11.5px;
+  }
+
+  .console-viewport {
+    height: 300px;
+    padding: 8px 10px;
+  }
+
+  .console-telemetry-hud {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px 14px;
+    padding: 12px 14px;
+  }
+
+  .hud-metric-cell {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .hud-action-cell {
+    grid-column: span 2;
+  }
+
+  .hud-truncate {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hud-fps-Cluster {
+    grid-column: span 2;
+    justify-content: space-between;
+    padding-top: 6px;
+    border-top: 1px dashed var(--hairline);
+  }
+
+  /* 4. 移动端 2x2 十字光栅指标长廊 */
+  .metrics-hairline-band {
+    padding: 28px 0 8px;
+  }
+
+  .hairline-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .hairline-metric-cell {
+    padding: 22px 16px;
+  }
+
+  .hairline-metric-cell:nth-child(odd) {
+    border-left: 1px solid var(--hairline);
+  }
+
+  .hairline-metric-cell:nth-child(n + 3) {
+    border-top: 1px solid var(--hairline);
+  }
+
+  .cell-top-meta {
+    margin-bottom: 12px;
+    font-size: 10px;
+  }
+
+  .cell-spec-label {
+    display: none;
+  }
+
+  .figure-num {
+    font-size: 30px;
+  }
+
+  .figure-unit {
+    font-size: 13px;
+  }
+
+  .cell-title {
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+
+  .cell-desc {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  /* 5. 移动端通用章节抬头（居中对齐，视觉平衡） */
+  .section-headline-group {
+    margin-bottom: 28px;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .section-serial-kicker {
+    font-size: 10.5px;
+    margin-bottom: 10px;
+    justify-content: center;
+  }
+
+  .section-super-title {
+    font-size: 25px;
+    line-height: 1.24;
+    margin-bottom: 10px;
+  }
+
+  .section-super-desc {
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+
+  /* 6. 移动端架构星图面板 */
+  .nexus-holo-stage {
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+
+  .nexus-core-reactor {
+    padding: 18px 14px;
+  }
+
+  .reactor-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .reactor-orb-wrap {
+    height: 110px;
+    margin-bottom: 16px;
+  }
+
+  .reactor-modules-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .nexus-adapter-pod {
+    padding: 14px 16px;
+  }
+
+  .nexus-bridge-footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  /* 7. 移动端 Bento 规格矩阵 & 示例库 */
+  .bento-hairline-matrix,
+  .atomic-gallery-grid {
     grid-template-columns: 1fr;
   }
+
+  .bento-span-2 {
+    grid-column: span 1;
+  }
+
+  .bento-matrix-cell,
+  .atomic-holo-card {
+    padding: 24px 18px;
+  }
+
+  .bento-title {
+    font-size: 18px;
+  }
+
+  .bento-desc {
+    font-size: 13.5px;
+    margin-bottom: 18px;
+  }
+
+  .bento-code-window {
+    padding: 10px 12px;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .bento-code-pre {
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: hidden;
+  }
+
+  /* 8. 移动端性能基准实验室 */
+  .benchmark-cyber-arena {
+    padding: 20px 16px;
+    border-radius: 16px;
+  }
+
+  .arena-live-console {
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 20px;
+    gap: 16px;
+  }
+
+  .arena-console-title {
+    font-size: 18px;
+  }
+
+  .arena-trigger-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .cyber-bench-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .arena-telemetry-readout {
+    grid-template-columns: 1fr;
+    margin-bottom: 24px;
+  }
+
+  .readout-box {
+    padding: 16px 4px;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline);
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .readout-box:last-child {
+    border-bottom: none;
+  }
+
+  .readout-num {
+    font-size: 20px;
+  }
+
   .race-track-line {
     grid-template-columns: 1fr;
     gap: 6px;
   }
-  .console-telemetry-hud {
-    grid-template-columns: repeat(2, 1fr);
+
+  .tag-ytree {
+    margin-left: 10px;
+    font-size: 11px;
+  }
+
+  .tag-legacy {
+    font-size: 11px;
+  }
+
+  /* 9. 移动端代码终端 */
+  .ide-topbar {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .ide-left-cluster {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ide-left-cluster .console-window-dots {
+    display: none;
+  }
+
+  .ide-tabs-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+
+  .ide-tab-pill {
+    justify-content: center;
+    padding: 6px 4px;
+    font-size: 11px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ide-right-actions {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .terminal-code-area pre,
+  .terminal-code-area .shiki,
+  .terminal-code-area code {
+    padding: 16px 14px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: hidden;
+  }
+
+  .terminal-code-area code {
+    padding: 0;
+  }
+
+  /* 10. 移动端示例画廊与页脚 */
+  .gallery-top-bar {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .gallery-fw-switch {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .epic-footer {
+    padding: 32px 0 44px;
+    margin-top: 64px;
+  }
+
+  .footer-content-row {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 18px;
+  }
+
+  .footer-brand {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .footer-links {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .footer-link-pill {
+    justify-content: center;
+    padding: 8px 6px;
+    font-size: 11px;
   }
 }
 
